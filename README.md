@@ -6,7 +6,7 @@ This project is a complete native desktop port of the original [PilcrowMD Androi
 
 ## ✨ Features
 
-- **Cross-Platform Native Apps:** Runs cleanly as an `.msi` on Windows, and `.rpm`/`.deb`/`.AppImage` on Linux.
+- **Cross-Platform Native Apps:** Runs cleanly as an `.msi`/`.exe` on Windows, and `.rpm`/`.deb`/`.AppImage` on Linux.
 - **Split Reader & Editor Modes:** Seamlessly switch between writing raw Markdown and reading beautifully typeset documents.
 - **Syntax Highlighting & Formatting:** Full support for standard Markdown, code blocks, tables, and strikethroughs.
 - **In-document Search:** Fast search with match highlighting and auto-scrolling to results.
