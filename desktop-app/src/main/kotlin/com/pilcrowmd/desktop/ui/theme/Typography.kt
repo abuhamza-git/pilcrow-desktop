@@ -1,0 +1,76 @@
+package com.pilcrowmd.desktop.ui.theme
+
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.platform.Font
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+
+val sourceSerif4Family = FontFamily(
+    Font("fonts/source_serif_4_regular.ttf", FontWeight.Normal),
+    Font("fonts/source_serif_4_bold.ttf", FontWeight.Bold),
+)
+
+val jetbrainsMonoFamily = FontFamily(
+    Font("fonts/jetbrains_mono_regular.ttf", FontWeight.Normal),
+    Font("fonts/jetbrains_mono_bold.ttf", FontWeight.Bold),
+)
+
+const val PreviewLineHeightMultiplier = 1.35f
+
+object PilcrowTypography {
+    val bodyStyle = TextStyle(
+        fontFamily = sourceSerif4Family,
+        fontSize = 17.sp,
+        fontWeight = FontWeight.Normal,
+        lineHeight = 1.7.em,
+    )
+
+    val h1Style = TextStyle(
+        fontFamily = sourceSerif4Family,
+        fontSize = 29.sp,
+        fontWeight = FontWeight.Bold,
+        lineHeight = 1.2.em,
+    )
+
+    val h2Style = TextStyle(
+        fontFamily = sourceSerif4Family,
+        fontSize = 23.sp,
+        fontWeight = FontWeight.Bold,
+        lineHeight = 1.2.em,
+    )
+
+    val h3Style = TextStyle(
+        fontFamily = sourceSerif4Family,
+        fontSize = 19.sp,
+        fontWeight = FontWeight.Bold,
+        lineHeight = 1.2.em,
+    )
+
+    val codeBlockStyle = TextStyle(
+        fontFamily = jetbrainsMonoFamily,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.Normal,
+        lineHeight = 1.7.em,
+    )
+
+    val editorStyle = TextStyle(
+        fontFamily = jetbrainsMonoFamily,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.Normal,
+        lineHeight = 1.75.em,
+    )
+
+    val inlineCodeStyle = TextStyle(
+        fontFamily = sourceSerif4Family,
+        fontSize = 15.3.sp,
+        fontWeight = FontWeight.Normal,
+    )
+
+    const val EDITOR_BASE_FONT_SIZE_SP: Float = 13f
+    const val PROSE_BODY_FONT_SIZE_SP: Float = 17f
+    const val CODE_BLOCK_FONT_SIZE_SP: Float = 14f
+    const val FOOTNOTE_FONT_SIZE_SP: Float = 15f
+    const val TABLE_FONT_SIZE_SP: Float = 15f
+}
