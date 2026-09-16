@@ -53,7 +53,7 @@ compose.desktop {
                 menuGroup = "PilcrowMD"
             }
             macOS {
-                iconFile.set(project.file("src/main/resources/icon.icns"))
+                
             }
         }
     }
