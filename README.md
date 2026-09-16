@@ -11,9 +11,19 @@ This project is a complete native desktop port of the original [PilcrowMD Androi
 - **Syntax Highlighting & Formatting:** Full support for standard Markdown, code blocks, tables, and strikethroughs.
 - **In-document Search:** Fast search with match highlighting and auto-scrolling to results.
 - **PDF Export:** Export your Markdown directly to a paginated, print-styled PDF (with full support for tables and code blocks).
-- **Customizable Typography:** Independent font scaling for both the reader and editor, with built-in font families (Source Serif 4, Atkinson Hyperlegible, Merriweather).
+- **Customizable Typography:** Independent font scaling for both the reader and editor, with built-in font families.
 - **Dark & Light Themes:** Toggle instantly between a default dark theme and a warm-cream light theme.
-- **Native OS Integration:** Registers as the default handler for `.md` files in your operating system, complete with native window icons.
+- **Native OS Integration:** Registers as the default handler for `.md` files in your operating system.
+
+## 📸 Screenshots
+
+<div align="center">
+
+| Reader Mode | Editor Mode |
+|:---:|:---:|
+| <img src="docs/screenshots/desktop-reader.png" width="400" alt="Pilcrow Desktop Reader Mode"> | <img src="docs/screenshots/desktop-editor.png" width="400" alt="Pilcrow Desktop Editor Mode"> |
+
+</div>
 
 ## 🚀 Download & Install
 
