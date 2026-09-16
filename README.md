@@ -1,12 +1,12 @@
 # PilcrowMD Desktop
 
-**PilcrowMD Desktop** is a beautiful, offline, distraction-free Markdown reader and editor for Windows, macOS, and Linux. 
+**PilcrowMD Desktop** is a beautiful, offline, distraction-free Markdown reader and editor for Windows and Linux. 
 
 This project is a complete native desktop port of the original [PilcrowMD Android app](https://github.com/pilcrowmd/pilcrow), built using **JetBrains Compose Desktop**. It brings the elegant, dual-pane Markdown experience from mobile directly to your computer.
 
 ## ✨ Features
 
-- **Cross-Platform Native Apps:** Runs cleanly as an `.msi` on Windows, `.dmg` on macOS, and `.rpm`/`.deb`/`.AppImage` on Linux.
+- **Cross-Platform Native Apps:** Runs cleanly as an `.msi` on Windows, and `.rpm`/`.deb`/`.AppImage` on Linux.
 - **Split Reader & Editor Modes:** Seamlessly switch between writing raw Markdown and reading beautifully typeset documents.
 - **Syntax Highlighting & Formatting:** Full support for standard Markdown, code blocks, tables, and strikethroughs.
 - **In-document Search:** Fast search with match highlighting and auto-scrolling to results.
@@ -30,7 +30,6 @@ This project is a complete native desktop port of the original [PilcrowMD Androi
 The easiest way to install PilcrowMD Desktop is to download the installer for your operating system from the **[Releases](https://github.com/abuhamza-git/pilcrow-desktop/releases)** page.
 
 - **Windows:** Download the `.msi` installer.
-- **macOS:** Download the `.dmg` installer.
 - **Linux:** Download the `.deb` (Debian/Ubuntu), `.rpm` (Fedora/RedHat), or use the portable `.AppImage`.
 
 *(Note: The GitHub Actions workflow automatically builds these installers on every release!)*

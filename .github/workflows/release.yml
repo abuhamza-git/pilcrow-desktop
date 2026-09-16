@@ -13,20 +13,12 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest]
         include:
           - os: ubuntu-latest
-            format: Deb
-            artifact_name: pilcrow-linux-deb
-            ext: deb
+            artifact_name: pilcrow-linux-packages
           - os: windows-latest
-            format: Msi
-            artifact_name: pilcrow-windows-msi
-            ext: msi
-          - os: macos-latest
-            format: Dmg
-            artifact_name: pilcrow-macos-dmg
-            ext: dmg
+            artifact_name: pilcrow-windows-packages
 
     runs-on: ${{ matrix.os }}
 

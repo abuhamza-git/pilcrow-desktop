@@ -37,7 +37,7 @@ fun MarkdownRenderer(content: String) {
 
 Tables are beautifully rendered and fully supported in our PDF exports:
 
-| Feature | Android | Desktop (Linux/Mac/Win) |
+| Feature | Android | Desktop (Linux/Win) |
 |---------|:---:|:---:|
 | Syntax Highlighting | ✅ | ✅ |
 | PDF Export | ✅ | ✅ |
