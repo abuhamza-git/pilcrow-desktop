@@ -42,18 +42,18 @@ compose.desktop {
             description = "A beautiful Markdown reader & editor"
             modules("java.instrument", "jdk.unsupported")
 
-            targetFormats(TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.AppImage)
+            targetFormats(TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.AppImage, TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Dmg)
 
             linux {
                 iconFile.set(project.file("src/main/resources/icon.png"))
                 appCategory = "TextEditor"
             }
             windows {
-                iconFile.set(project.file("src/main/resources/icon.png"))
+                iconFile.set(project.file("src/main/resources/icon.ico"))
                 menuGroup = "PilcrowMD"
             }
             macOS {
-                iconFile.set(project.file("src/main/resources/icon.png"))
+                iconFile.set(project.file("src/main/resources/icon.icns"))
             }
         }
     }

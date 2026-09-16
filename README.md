@@ -27,7 +27,7 @@ This project is a complete native desktop port of the original [PilcrowMD Androi
 
 ## 🚀 Download & Install
 
-The easiest way to install PilcrowMD Desktop is to download the installer for your operating system from the **[Releases](https://github.com/YOUR_GITHUB_USERNAME/pilcrow-desktop/releases)** page.
+The easiest way to install PilcrowMD Desktop is to download the installer for your operating system from the **[Releases](https://github.com/abuhamza-git/pilcrow-desktop/releases)** page.
 
 - **Windows:** Download the `.msi` installer.
 - **macOS:** Download the `.dmg` installer.
@@ -54,7 +54,7 @@ PilcrowMD Desktop was built by extracting the pure-Kotlin domain logic from the 
 Requirements: JDK 17+
 
 ```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/pilcrow-desktop.git
+git clone https://github.com/abuhamza-git/pilcrow-desktop.git
 cd pilcrow-desktop
 
 # Run the app locally for testing
