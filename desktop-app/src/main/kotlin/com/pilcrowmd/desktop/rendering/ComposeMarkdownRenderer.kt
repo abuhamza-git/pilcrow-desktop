@@ -1,13 +1,21 @@
 package com.pilcrowmd.desktop.rendering
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.ContextMenuArea
+import androidx.compose.foundation.ContextMenuItem
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
@@ -23,6 +31,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import org.commonmark.ext.front.matter.YamlFrontMatterBlock
 import org.commonmark.ext.gfm.strikethrough.Strikethrough
 import org.commonmark.ext.gfm.tables.*
@@ -33,7 +42,8 @@ import org.commonmark.node.*
 fun ComposeMarkdownRenderer(
     node: Node,
     modifier: Modifier = Modifier,
-    listState: androidx.compose.foundation.lazy.LazyListState = androidx.compose.foundation.lazy.rememberLazyListState(),
+    scrollState: androidx.compose.foundation.ScrollState = androidx.compose.foundation.rememberScrollState(),
+    onHeadingPositioned: ((Int, Float) -> Unit)? = null,
     searchQuery: String = "",
     searchCurrentIndex: Int = 0
 ) {
@@ -73,22 +83,60 @@ fun ComposeMarkdownRenderer(
         }
     }
 
-    androidx.compose.runtime.LaunchedEffect(activeBlockIndex) {
-        if (activeBlockIndex >= 0) {
-            listState.animateScrollToItem(activeBlockIndex)
-        }
+    val focusRequester = androidx.compose.runtime.remember { FocusRequester() }
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
     }
 
     SelectionContainer {
-        LazyColumn(
-            state = listState,
-            modifier = modifier.fillMaxSize().padding(16.dp),
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(16.dp)
+                .focusRequester(focusRequester)
+                .focusable()
+                .onPreviewKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyDown) {
+                        when (event.key) {
+                            Key.DirectionDown -> {
+                                coroutineScope.launch { scrollState.animateScrollBy(50f) }
+                                true
+                            }
+                            Key.DirectionUp -> {
+                                coroutineScope.launch { scrollState.animateScrollBy(-50f) }
+                                true
+                            }
+                            Key.Spacebar -> {
+                                coroutineScope.launch { scrollState.animateScrollBy(400f) }
+                                true
+                            }
+                            else -> false
+                        }
+                    } else false
+                }
+                .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(blocks.size) { i ->
-                val block = blocks[i]
+            blocks.forEachIndexed { i, block ->
                 val matchIndexForBlock = if (i == activeBlockIndex) activeMatchInBlock else -1
-                RenderBlock(block, searchQuery, matchIndexForBlock)
+                val mod = if (block is Heading && onHeadingPositioned != null) {
+                    Modifier.onGloballyPositioned { layoutCoordinates ->
+                        onHeadingPositioned(i, layoutCoordinates.positionInParent().y)
+                        if (i == activeBlockIndex) {
+                            coroutineScope.launch { scrollState.animateScrollTo(layoutCoordinates.positionInParent().y.toInt()) }
+                        }
+                    }
+                } else if (i == activeBlockIndex) {
+                    Modifier.onGloballyPositioned { layoutCoordinates ->
+                        coroutineScope.launch { scrollState.animateScrollTo(layoutCoordinates.positionInParent().y.toInt()) }
+                    }
+                } else Modifier
+                
+                Box(modifier = mod) {
+                    RenderBlock(block, searchQuery, matchIndexForBlock)
+                }
             }
         }
     }
@@ -106,7 +154,6 @@ fun RenderBlock(node: Node, searchQuery: String = "", activeMatchIndex: Int = -1
         is YamlFrontMatterBlock -> MarkdownFrontMatter(node)
         is TableBlock -> MarkdownTable(node, searchQuery, activeMatchIndex)
         else -> {
-            // Fallback for custom or unhandled block nodes
             Text("Unsupported block: \${node.javaClass.simpleName}")
         }
     }
@@ -132,11 +179,44 @@ fun MarkdownHeading(node: Heading, searchQuery: String = "", activeMatchIndex: I
 
 @Composable
 fun MarkdownParagraph(node: Paragraph, searchQuery: String = "", activeMatchIndex: Int = -1) {
-    Text(
-        text = buildInlineText(node, searchQuery, activeMatchIndex),
-        style = MaterialTheme.typography.bodyLarge,
-        fontFamily = FontFamily.Serif
-    )
+    val links = mutableListOf<String>()
+    fun findLinks(n: Node) {
+        if (n is Link) links.add(n.destination)
+        var child = n.firstChild
+        while (child != null) { findLinks(child); child = child.next }
+    }
+    findLinks(node)
+
+    if (links.isNotEmpty()) {
+        ContextMenuArea(
+            items = {
+                val menuItems = mutableListOf<ContextMenuItem>()
+                links.distinct().forEach { url ->
+                    menuItems.add(ContextMenuItem("Open: $url") {
+                        try { java.awt.Desktop.getDesktop().browse(java.net.URI(url)) } catch (_: Exception) {}
+                    })
+                    menuItems.add(ContextMenuItem("Copy: $url") {
+                        java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(
+                            java.awt.datatransfer.StringSelection(url), null
+                        )
+                    })
+                }
+                menuItems
+            }
+        ) {
+            Text(
+                text = buildInlineText(node, searchQuery, activeMatchIndex),
+                style = MaterialTheme.typography.bodyLarge,
+                fontFamily = FontFamily.Serif
+            )
+        }
+    } else {
+        Text(
+            text = buildInlineText(node, searchQuery, activeMatchIndex),
+            style = MaterialTheme.typography.bodyLarge,
+            fontFamily = FontFamily.Serif
+        )
+    }
 }
 
 @Composable
@@ -158,7 +238,7 @@ fun MarkdownCodeBlock(node: FencedCodeBlock) {
             fontFamily = FontFamily.Monospace,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(end = 40.dp) // Leave space for copy button
+            modifier = Modifier.padding(end = 40.dp)
         )
         
         IconButton(
@@ -228,13 +308,13 @@ fun MarkdownList(node: ListBlock, searchQuery: String = "", activeMatchIndex: In
 
                 if (taskMarker != null) {
                     Checkbox(
-                        checked = taskMarker.isChecked(), // Readonly
+                        checked = taskMarker.isChecked(),
                         onCheckedChange = null,
                         modifier = Modifier.padding(end = 8.dp)
                     )
                 } else {
                     Text(
-                        text = if (isOrdered) "\$index. " else "• ",
+                        text = if (isOrdered) "$index. " else "• ",
                         modifier = Modifier.padding(end = 8.dp),
                         style = MaterialTheme.typography.bodyLarge
                     )
@@ -255,38 +335,41 @@ fun MarkdownList(node: ListBlock, searchQuery: String = "", activeMatchIndex: In
 
 @Composable
 fun MarkdownTable(node: TableBlock, searchQuery: String = "", activeMatchIndex: Int = -1) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, MaterialTheme.colorScheme.outline)
-    ) {
-        var section = node.firstChild
-        while (section != null) {
-            var row = section.firstChild
-            while (row != null) {
-                if (row is TableRow) {
-                    val isHeader = section is TableHead
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(if (isHeader) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
-                            .drawBehind {
-                                val strokeWidth = 1.dp.toPx()
-                                drawLine(
-                                    color = Color.LightGray,
-                                    start = androidx.compose.ui.geometry.Offset(0f, size.height),
-                                    end = androidx.compose.ui.geometry.Offset(size.width, size.height),
-                                    strokeWidth = strokeWidth
-                                )
-                            }
-                    ) {
+    var columnCount = 0
+    var headerRow = node.firstChild?.firstChild
+    while (headerRow != null) {
+        if (headerRow is TableRow) {
+            var cell = headerRow.firstChild
+            while (cell != null) {
+                if (cell is TableCell) columnCount++
+                cell = cell.next
+            }
+            break
+        }
+        headerRow = headerRow.next
+    }
+    if (columnCount == 0) return
+
+    Box(modifier = Modifier.padding(vertical = 8.dp).fillMaxWidth()) {
+        SimpleTableLayout(
+            columnCount = columnCount,
+            modifier = Modifier.border(1.dp, MaterialTheme.colorScheme.outline)
+        ) {
+            var section = node.firstChild
+            while (section != null) {
+                var row = section.firstChild
+                while (row != null) {
+                    if (row is TableRow) {
+                        val isHeader = section is TableHead
                         var cell = row.firstChild
-                        while (cell != null) {
+                        var colIndex = 0
+                        while (cell != null && colIndex < columnCount) {
                             if (cell is TableCell) {
                                 Box(
                                     modifier = Modifier
-                                        .weight(1f)
-                                        .padding(8.dp)
+                                        .background(if (isHeader) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent)
+                                        .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha=0.5f))
+                                        .padding(12.dp)
                                 ) {
                                     val textWeight = if (cell.isHeader) FontWeight.Bold else FontWeight.Normal
                                     Text(
@@ -295,14 +378,15 @@ fun MarkdownTable(node: TableBlock, searchQuery: String = "", activeMatchIndex: 
                                         style = MaterialTheme.typography.bodyMedium
                                     )
                                 }
+                                colIndex++
                             }
                             cell = cell.next
                         }
                     }
+                    row = row.next
                 }
-                row = row.next
+                section = section.next
             }
-            section = section.next
         }
     }
 }
@@ -315,7 +399,6 @@ fun MarkdownFrontMatter(node: YamlFrontMatterBlock) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Frontmatter", style = MaterialTheme.typography.labelLarge)
-            // Just basic representation for now
         }
     }
 }
@@ -385,6 +468,7 @@ fun buildInlineText(node: Node, searchQuery: String = "", activeMatchIndex: Int 
     }
     return result
 }
+
 fun extractPlainText(node: Node): String {
     val sb = StringBuilder()
     if (node is Text) sb.append(node.literal)

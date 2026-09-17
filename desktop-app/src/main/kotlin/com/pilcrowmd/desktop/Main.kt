@@ -7,11 +7,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.NoteAdd
 
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
-
-
 
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.text.AnnotatedString
@@ -56,6 +55,7 @@ fun main(args: Array<String>) = application {
     val redoStack = remember { mutableListOf<String>() }
     var isUndoRedoAction by remember { mutableStateOf(false) }
     var showOpenDialog by remember { mutableStateOf(false) }
+    var showNewDialog by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showSearchBar by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -129,6 +129,7 @@ fun main(args: Array<String>) = application {
                         // Welcome screen
                         WelcomeScreen(
                             onOpenFile = { showOpenDialog = true },
+                            onNewFile = { showNewDialog = true },
                             onSettings = { showSettings = true },
                             recentFiles = recentFiles,
                             onOpenRecent = { path ->
@@ -137,179 +138,221 @@ fun main(args: Array<String>) = application {
                         )
                     } else {
                         var showTOC by remember { mutableStateOf(false) }
-                        val previewListState = androidx.compose.foundation.lazy.rememberLazyListState()
-                        Row(modifier = Modifier.fillMaxSize()) {
-                            if (showTOC) {
-                                Surface(
-                                    modifier = Modifier.width(280.dp).fillMaxHeight(),
-                                    color = MaterialTheme.colorScheme.surfaceVariant
-                                ) {
-                                    val headings = remember(fileContent) {
-                                        com.pilcrowmd.core.domain.usecase.ParseMarkdownHeadingsUseCase().extractHeadings(fileContent)
+                        val previewScrollState = androidx.compose.foundation.rememberScrollState()
+                        val editorScrollState = androidx.compose.foundation.rememberScrollState()
+                        val headingPositions = remember { mutableStateMapOf<Int, Float>() }
+
+                        // OUTER Column: Toolbar on top, then content row below
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            // Toolbar spans FULL width, always on top
+                            com.pilcrowmd.desktop.ui.PilcrowToolbar(
+                                isEditorMode = isEditorMode,
+                                onModeSelected = { isEditorMode = it },
+                                onOpen = { showOpenDialog = true },
+                                onNew = { showNewDialog = true },
+                                onSettings = { showSettings = true },
+                                onSave = {
+                                    currentFilePath?.let { path ->
+                                        coroutineScope.launch {
+                                            fileRepository.saveFile(path, fileContent).onSuccess {
+                                                isDirty = false
+                                                snackbarHostState.showSnackbar("File saved successfully")
+                                            }.onFailure {
+                                                snackbarHostState.showSnackbar("Failed to save file")
+                                            }
+                                        }
                                     }
-                                    Column(modifier = Modifier.fillMaxSize()) {
-                                        Text(
-                                            text = "Table of Contents",
-                                            style = MaterialTheme.typography.titleMedium,
-                                            modifier = Modifier.padding(16.dp)
-                                        )
-                                        HorizontalDivider()
-                                        androidx.compose.foundation.lazy.LazyColumn {
-                                            items(headings.size) { i ->
-                                                val heading = headings[i]
-                                                val indent = (heading.level - 1) * 16
-                                                Text(
-                                                    text = heading.text,
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .clickable {
-                                                            if (!isEditorMode) {
-                                                                coroutineScope.launch {
-                                                                    previewListState.animateScrollToItem(heading.listIndex)
+                                },
+                                onClose = { currentFilePath = null; fileContent = ""; isDirty = false; showTOC = false },
+                                onTOC = { showTOC = !showTOC },
+                                onSearch = { showSearchBar = !showSearchBar },
+                                onExportPdf = {
+                                    val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Export as PDF", java.awt.FileDialog.SAVE)
+                                    currentFilePath?.let {
+                                        dialog.directory = it.parent.toString()
+                                        val currentName = it.fileName.toString()
+                                        dialog.file = if (currentName.endsWith(".md", ignoreCase = true)) {
+                                            currentName.substringBeforeLast(".") + ".pdf"
+                                        } else {
+                                            "$currentName.pdf"
+                                        }
+                                    }
+                                    dialog.isVisible = true
+                                    if (dialog.directory != null && dialog.file != null) {
+                                        var pathStr = java.nio.file.Path.of(dialog.directory, dialog.file).toString()
+                                        if (!pathStr.endsWith(".pdf", ignoreCase = true)) {
+                                            pathStr += ".pdf"
+                                        }
+                                        val path = java.nio.file.Path.of(pathStr)
+                                        coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                            try {
+                                                com.pilcrowmd.desktop.export.PdfExporter.exportToPdf(fileContent, path)
+                                                snackbarHostState.showSnackbar("Exported PDF successfully!")
+                                            } catch (e: Exception) {
+                                                e.printStackTrace()
+                                                snackbarHostState.showSnackbar("Failed to export PDF")
+                                            }
+                                        }
+                                    }
+                                },
+                                onUndo = {
+                                    if (undoStack.isNotEmpty()) {
+                                        redoStack.add(fileContent)
+                                        isUndoRedoAction = true
+                                        fileContent = undoStack.removeAt(undoStack.lastIndex)
+                                    }
+                                },
+                                onRedo = {
+                                    if (redoStack.isNotEmpty()) {
+                                        undoStack.add(fileContent)
+                                        isUndoRedoAction = true
+                                        fileContent = redoStack.removeAt(redoStack.lastIndex)
+                                    }
+                                },
+                                onSaveAs = {
+                                    val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Save a copy", java.awt.FileDialog.SAVE)
+                                    currentFilePath?.let {
+                                        dialog.directory = it.parent.toString()
+                                        dialog.file = it.fileName.toString()
+                                    }
+                                    dialog.isVisible = true
+                                    if (dialog.directory != null && dialog.file != null) {
+                                        val path = java.nio.file.Path.of(dialog.directory, dialog.file)
+                                        coroutineScope.launch {
+                                            fileRepository.saveFile(path, fileContent).onSuccess {
+                                                snackbarHostState.showSnackbar("Copy saved successfully")
+                                            }
+                                        }
+                                    }
+                                },
+                                isDirty = isDirty,
+                                showTOC = showTOC
+                            )
+
+                            // Search bar (below toolbar, above content)
+                            if (showSearchBar) {
+                                com.pilcrowmd.desktop.ui.SearchBar(
+                                    query = searchQuery,
+                                    onQueryChange = { searchQuery = it },
+                                    matchCount = searchMatchCount,
+                                    currentIndex = searchCurrentIndex,
+                                    onPrevious = {
+                                        if (searchMatchCount > 0) {
+                                            searchCurrentIndex = (searchCurrentIndex - 1 + searchMatchCount) % searchMatchCount
+                                        }
+                                    },
+                                    onNext = {
+                                        if (searchMatchCount > 0) {
+                                            searchCurrentIndex = (searchCurrentIndex + 1) % searchMatchCount
+                                        }
+                                    },
+                                    onClose = {
+                                        showSearchBar = false
+                                        searchQuery = ""
+                                    }
+                                )
+                            }
+
+                            // Content row: TOC sidebar + editor/reader
+                            Row(modifier = Modifier.fillMaxSize().weight(1f)) {
+                                // TOC sidebar (starts BELOW toolbar)
+                                if (showTOC) {
+                                    Surface(
+                                        modifier = Modifier.width(280.dp).fillMaxHeight(),
+                                        color = MaterialTheme.colorScheme.surfaceVariant
+                                    ) {
+                                        val headings = remember(fileContent) {
+                                            com.pilcrowmd.core.domain.usecase.ParseMarkdownHeadingsUseCase().extractHeadings(fileContent)
+                                        }
+                                        Column(modifier = Modifier.fillMaxSize()) {
+                                            Text(
+                                                text = "Table of Contents",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                modifier = Modifier.padding(16.dp)
+                                            )
+                                            HorizontalDivider()
+                                            androidx.compose.foundation.lazy.LazyColumn {
+                                                items(headings.size) { i ->
+                                                    val heading = headings[i]
+                                                    val indent = (heading.level - 1) * 16
+                                                    Text(
+                                                        text = heading.text,
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .clickable {
+                                                                if (!isEditorMode) {
+                                                                    coroutineScope.launch {
+                                                                        val y = headingPositions[heading.listIndex]
+                                                                        if (y != null) {
+                                                                            previewScrollState.animateScrollTo(y.toInt())
+                                                                        }
+                                                                    }
                                                                 }
                                                             }
-                                                        }
-                                                        .padding(start = (16 + indent).dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
-                                                )
+                                                            .padding(start = (16 + indent).dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
+                                                    )
+                                                }
                                             }
                                         }
                                     }
+                                    Box(modifier = Modifier.fillMaxHeight().width(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
                                 }
-                                Box(modifier = Modifier.fillMaxHeight().width(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
-                            }
-                            
-                            Column(modifier = Modifier.fillMaxSize()) {
-                                com.pilcrowmd.desktop.ui.PilcrowToolbar(
-                                    isEditorMode = isEditorMode,
-                                    onModeSelected = { isEditorMode = it },
-                                    onOpen = { showOpenDialog = true },
-                                    onSettings = { showSettings = true },
-                                    onSave = {
-                                        currentFilePath?.let { path ->
-                                            coroutineScope.launch {
-                                                fileRepository.saveFile(path, fileContent).onSuccess {
-                                                    isDirty = false
-                                                    snackbarHostState.showSnackbar("File saved successfully")
-                                                }.onFailure {
-                                                    snackbarHostState.showSnackbar("Failed to save file")
+
+                                // Main content area
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    if (isEditorMode) {
+                                        // === EDITOR MODE ===
+                                        EditorScreen(
+                                            content = fileContent,
+                                            onContentChange = { newContent ->
+                                                if (!isUndoRedoAction) {
+                                                    undoStack.add(fileContent)
+                                                    if (undoStack.size > 100) undoStack.removeAt(0)
+                                                    redoStack.clear()
                                                 }
-                                            }
+                                                isUndoRedoAction = false
+                                                fileContent = newContent
+                                                isDirty = true
+                                            },
+                                            showLineNumbers = lineNumbersEnabled,
+                                            searchQuery = searchQuery,
+                                            searchCurrentIndex = searchCurrentIndex,
+                                            scrollState = editorScrollState
+                                        )
+                                        androidx.compose.foundation.VerticalScrollbar(
+                                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                                            adapter = androidx.compose.foundation.rememberScrollbarAdapter(editorScrollState),
+                                            style = androidx.compose.foundation.defaultScrollbarStyle().copy(
+                                                unhoverColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                                hoverColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.50f)
+                                            )
+                                        )
+                                    } else {
+                                        // === READER MODE ===
+                                        val documentNode = remember(fileContent) { com.pilcrowmd.desktop.rendering.MarkdownParser.parse(fileContent) }
+                                        Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.TopCenter
+                                        ) {
+                                            ComposeMarkdownRenderer(
+                                                node = documentNode,
+                                                modifier = Modifier.fillMaxHeight().widthIn(max = 1000.dp).padding(horizontal = 32.dp, vertical = 16.dp),
+                                                scrollState = previewScrollState,
+                                                searchQuery = searchQuery,
+                                                searchCurrentIndex = searchCurrentIndex,
+                                                onHeadingPositioned = { idx, y -> headingPositions[idx] = y }
+                                            )
                                         }
-                                    },
-                                    onClose = { currentFilePath = null; fileContent = ""; isDirty = false; showTOC = false },
-                                    onTOC = { showTOC = !showTOC },
-                                    onSearch = { showSearchBar = !showSearchBar },
-                                    onExportPdf = {
-                                        val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Export as PDF", java.awt.FileDialog.SAVE)
-                                        currentFilePath?.let {
-                                            dialog.directory = it.parent.toString()
-                                            val currentName = it.fileName.toString()
-                                            dialog.file = if (currentName.endsWith(".md", ignoreCase = true)) {
-                                                currentName.substringBeforeLast(".") + ".pdf"
-                                            } else {
-                                                "$currentName.pdf"
-                                            }
-                                        }
-                                        dialog.isVisible = true
-                                        if (dialog.directory != null && dialog.file != null) {
-                                            var pathStr = java.nio.file.Path.of(dialog.directory, dialog.file).toString()
-                                            if (!pathStr.endsWith(".pdf", ignoreCase = true)) {
-                                                pathStr += ".pdf"
-                                            }
-                                            val path = java.nio.file.Path.of(pathStr)
-                                            coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                                try {
-                                                    com.pilcrowmd.desktop.export.PdfExporter.exportToPdf(fileContent, path)
-                                                    snackbarHostState.showSnackbar("Exported PDF successfully!")
-                                                } catch (e: Exception) {
-                                                    e.printStackTrace()
-                                                    snackbarHostState.showSnackbar("Failed to export PDF")
-                                                }
-                                            }
-                                        }
-                                    },
-                                    onUndo = {
-                                        if (undoStack.isNotEmpty()) {
-                                            redoStack.add(fileContent)
-                                            isUndoRedoAction = true
-                                            fileContent = undoStack.removeAt(undoStack.lastIndex)
-                                        }
-                                    },
-                                    onRedo = {
-                                        if (redoStack.isNotEmpty()) {
-                                            undoStack.add(fileContent)
-                                            isUndoRedoAction = true
-                                            fileContent = redoStack.removeAt(redoStack.lastIndex)
-                                        }
-                                    },
-                                    onSaveAs = {
-                                        // Use AWT FileDialog directly for synchronous Save As
-                                        val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Save a copy", java.awt.FileDialog.SAVE)
-                                        currentFilePath?.let {
-                                            dialog.directory = it.parent.toString()
-                                            dialog.file = it.fileName.toString()
-                                        }
-                                        dialog.isVisible = true
-                                        if (dialog.directory != null && dialog.file != null) {
-                                            val path = java.nio.file.Path.of(dialog.directory, dialog.file)
-                                            coroutineScope.launch {
-                                                fileRepository.saveFile(path, fileContent).onSuccess {
-                                                    snackbarHostState.showSnackbar("Copy saved successfully")
-                                                }
-                                            }
-                                        }
-                                    },
-                                    isDirty = isDirty
-                                )
-                                if (showSearchBar) {
-                                    com.pilcrowmd.desktop.ui.SearchBar(
-                                        query = searchQuery,
-                                        onQueryChange = { searchQuery = it },
-                                        matchCount = searchMatchCount,
-                                        currentIndex = searchCurrentIndex,
-                                        onPrevious = {
-                                            if (searchMatchCount > 0) {
-                                                searchCurrentIndex = (searchCurrentIndex - 1 + searchMatchCount) % searchMatchCount
-                                            }
-                                        },
-                                        onNext = {
-                                            if (searchMatchCount > 0) {
-                                                searchCurrentIndex = (searchCurrentIndex + 1) % searchMatchCount
-                                            }
-                                        },
-                                        onClose = {
-                                            showSearchBar = false
-                                            searchQuery = ""
-                                        }
-                                    )
-                                }
-                                if (isEditorMode) {
-                                    EditorScreen(
-                                        content = fileContent,
-                                        onContentChange = { newContent ->
-                                            if (!isUndoRedoAction) {
-                                                undoStack.add(fileContent)
-                                                if (undoStack.size > 100) undoStack.removeAt(0)
-                                                redoStack.clear()
-                                            }
-                                            isUndoRedoAction = false
-                                            fileContent = newContent
-                                            isDirty = true
-                                        },
-                                        showLineNumbers = lineNumbersEnabled,
-                                        searchQuery = searchQuery,
-                                        searchCurrentIndex = searchCurrentIndex
-                                    )
-                                } else {
-                                    val documentNode = remember(fileContent) { com.pilcrowmd.desktop.rendering.MarkdownParser.parse(fileContent) }
-                                    ComposeMarkdownRenderer(
-                                        node = documentNode,
-                                        modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 16.dp),
-                                        listState = previewListState,
-                                        searchQuery = searchQuery,
-                                        searchCurrentIndex = searchCurrentIndex
-                                    )
+                                        androidx.compose.foundation.VerticalScrollbar(
+                                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                                            adapter = androidx.compose.foundation.rememberScrollbarAdapter(previewScrollState),
+                                            style = androidx.compose.foundation.defaultScrollbarStyle().copy(
+                                                unhoverColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                                                hoverColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.50f)
+                                            )
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -336,12 +379,33 @@ fun main(args: Array<String>) = application {
                 }
             }
         }
+
+        // New file dialog
+        if (showNewDialog) {
+            LaunchedEffect(Unit) {
+                val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Create New Markdown File", java.awt.FileDialog.SAVE)
+                dialog.file = "untitled.md"
+                dialog.isVisible = true
+                showNewDialog = false
+                if (dialog.directory != null && dialog.file != null) {
+                    var fileName = dialog.file
+                    if (!fileName.endsWith(".md", ignoreCase = true)) {
+                        fileName += ".md"
+                    }
+                    val path = java.nio.file.Path.of(dialog.directory, fileName)
+                    fileRepository.saveFile(path, "").onSuccess {
+                        openDocument(path)
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
 fun WelcomeScreen(
     onOpenFile: () -> Unit,
+    onNewFile: () -> Unit,
     onSettings: () -> Unit,
     recentFiles: List<com.pilcrowmd.core.storage.RecentFile>,
     onOpenRecent: (Path) -> Unit
@@ -393,14 +457,26 @@ fun WelcomeScreen(
 
                 // Actions
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(
-                        onClick = onOpenFile,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = MaterialTheme.shapes.medium
-                    ) {
-                        Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Open File...", style = MaterialTheme.typography.labelLarge)
+                    // Open + New side by side
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(
+                            onClick = onOpenFile,
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = MaterialTheme.shapes.medium
+                        ) {
+                            Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Open File", style = MaterialTheme.typography.labelLarge)
+                        }
+                        OutlinedButton(
+                            onClick = onNewFile,
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = MaterialTheme.shapes.medium
+                        ) {
+                            Icon(Icons.Default.NoteAdd, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("New File", style = MaterialTheme.typography.labelLarge)
+                        }
                     }
                     
                     OutlinedButton(
@@ -475,19 +551,21 @@ fun WelcomeScreen(
 }
 
 @Composable
-fun EditorScreen(content: String, onContentChange: (String) -> Unit, showLineNumbers: Boolean, searchQuery: String = "", searchCurrentIndex: Int = 0) {
-    // Own the TextFieldValue — do NOT re-key on `content` or cursor resets every keystroke.
+fun EditorScreen(
+    content: String,
+    onContentChange: (String) -> Unit,
+    showLineNumbers: Boolean,
+    searchQuery: String = "",
+    searchCurrentIndex: Int = 0,
+    scrollState: androidx.compose.foundation.ScrollState = androidx.compose.foundation.rememberScrollState()
+) {
     var textState by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(content)) }
 
-    // Sync when parent changes content externally (e.g. opening a new file),
-    // but NOT when the change came from our own typing.
     var lastExternalContent by remember { mutableStateOf(content) }
     if (content != lastExternalContent && content != textState.text) {
-        // External change (file opened, reverted, etc.)
         textState = androidx.compose.ui.text.input.TextFieldValue(content)
         lastExternalContent = content
     } else if (content != lastExternalContent) {
-        // Our own typing propagated back — just track it, don't reset.
         lastExternalContent = content
     }
 
@@ -514,19 +592,16 @@ fun EditorScreen(content: String, onContentChange: (String) -> Unit, showLineNum
         }
     }
     
-    // Build the display value preserving the real selection and composition from textState.
     val textFieldValue = androidx.compose.ui.text.input.TextFieldValue(
         annotatedString = annotatedString,
         selection = textState.selection,
         composition = textState.composition
     )
 
-    val scrollState = androidx.compose.foundation.rememberScrollState()
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     class TextLayoutHolder(var result: androidx.compose.ui.text.TextLayoutResult? = null)
     val layoutHolder = remember { TextLayoutHolder() }
     
-    // Auto-scroll to active search match
     LaunchedEffect(searchCurrentIndex, searchQuery) {
         if (searchQuery.isNotEmpty()) {
             var layout = layoutHolder.result
@@ -548,37 +623,42 @@ fun EditorScreen(content: String, onContentChange: (String) -> Unit, showLineNum
         }
     }
 
-    Row(modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 16.dp).verticalScroll(scrollState)) {
-        if (showLineNumbers) {
-            val lineCount = textState.text.count { it == '\n' } + 1
-            val lineNumbersText = (1..lineCount).joinToString("\n")
-            Text(
-                text = lineNumbersText,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.End
-                ),
-                modifier = Modifier.padding(end = 16.dp).widthIn(min = 24.dp)
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        Row(
+            modifier = Modifier
+                .fillMaxHeight()
+                .widthIn(max = 1000.dp)
+                .padding(horizontal = 32.dp, vertical = 16.dp)
+                .verticalScroll(scrollState)
+        ) {
+            if (showLineNumbers) {
+                val lineCount = textState.text.count { it == '\n' } + 1
+                val lineNumbersText = (1..lineCount).joinToString("\n")
+                Text(
+                    text = lineNumbersText,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End
+                    ),
+                    modifier = Modifier.padding(end = 16.dp).widthIn(min = 24.dp)
+                )
+            }
+            androidx.compose.foundation.text.BasicTextField(
+                value = textFieldValue,
+                onValueChange = { newValue ->
+                    textState = newValue.copy(annotatedString = AnnotatedString(newValue.text))
+                    onContentChange(newValue.text)
+                },
+                onTextLayout = { result ->
+                    layoutHolder.result = result
+                },
+                modifier = Modifier.weight(1f).bringIntoViewRequester(bringIntoViewRequester),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                    color = MaterialTheme.colorScheme.onBackground,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
             )
         }
-        androidx.compose.foundation.text.BasicTextField(
-            value = textFieldValue,
-            onValueChange = { newValue ->
-                // Preserve the full TextFieldValue (selection, composition, undo history).
-                // Only replace the annotated string with plain text so our search highlighting
-                // doesn't feed back into the editing buffer.
-                textState = newValue.copy(annotatedString = AnnotatedString(newValue.text))
-                onContentChange(newValue.text)
-            },
-            onTextLayout = { result ->
-                layoutHolder.result = result
-            },
-            modifier = Modifier.weight(1f).bringIntoViewRequester(bringIntoViewRequester),
-            textStyle = MaterialTheme.typography.bodyMedium.copy(
-                color = MaterialTheme.colorScheme.onBackground,
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-            )
-        )
     }
 }
