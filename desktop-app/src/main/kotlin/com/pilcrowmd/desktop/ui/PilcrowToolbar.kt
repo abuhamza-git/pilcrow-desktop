@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.automirrored.outlined.Redo
+import androidx.compose.material.icons.automirrored.outlined.NoteAdd
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -24,6 +25,7 @@ fun PilcrowToolbar(
     isEditorMode: Boolean,
     onModeSelected: (Boolean) -> Unit,
     onOpen: () -> Unit,
+    onNew: () -> Unit,
     onSettings: () -> Unit,
     onSave: () -> Unit,
     onClose: () -> Unit,
@@ -33,53 +35,75 @@ fun PilcrowToolbar(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onSaveAs: () -> Unit,
-    isDirty: Boolean
+    isDirty: Boolean,
+    showTOC: Boolean = false
 ) {
     Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
                 .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            contentAlignment = Alignment.Center
         ) {
-            // Left side: View/Edit toggle + Open/Settings
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Row(
+            // LEFT SIDE: TOC + Files
+            Row(
+                modifier = Modifier.align(Alignment.CenterStart),
+                verticalAlignment = Alignment.CenterVertically, 
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // TOC button
+                Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .background(if (showTOC) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+                        .clickable(onClick = onTOC)
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    SegmentIcon(
-                        icon = Icons.Outlined.Visibility,
-                        selected = !isEditorMode,
-                        onClick = { onModeSelected(false) }
-                    )
-                    SegmentIcon(
-                        icon = Icons.Outlined.Edit,
-                        selected = isEditorMode,
-                        onClick = { onModeSelected(true) }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.MenuBook,
+                        contentDescription = "Table of Contents",
+                        tint = if (showTOC) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                     )
                 }
                 
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    ActionIcon(icon = Icons.AutoMirrored.Outlined.NoteAdd, onClick = onNew)
                     ActionIcon(icon = Icons.Outlined.FolderOpen, onClick = onOpen)
                     ActionIcon(icon = Icons.Default.Settings, onClick = onSettings)
                 }
             }
 
-            // Right side: Tools
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            // CENTER: View/Edit toggle
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SegmentText(
+                    text = "Reader",
+                    selected = !isEditorMode,
+                    onClick = { onModeSelected(false) }
+                )
+                SegmentText(
+                    text = "Editor",
+                    selected = isEditorMode,
+                    onClick = { onModeSelected(true) }
+                )
+            }
+
+            // RIGHT SIDE: Tools
+            Row(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                verticalAlignment = Alignment.CenterVertically, 
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 ActionIcon(
                     icon = Icons.Outlined.Search,
                     onClick = onSearch
-                )
-                ActionIcon(
-                    icon = Icons.AutoMirrored.Outlined.MenuBook,
-                    onClick = onTOC
                 )
                 ActionIcon(
                     icon = Icons.Outlined.Save,
@@ -129,20 +153,20 @@ private fun ActionIcon(icon: ImageVector, onClick: () -> Unit, tint: Color = Mat
 }
 
 @Composable
-private fun SegmentIcon(icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
+private fun SegmentText(text: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(36.dp)
+            .height(28.dp)
             .clip(RoundedCornerShape(6.dp))
             .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
