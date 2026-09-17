@@ -16,9 +16,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
@@ -45,7 +46,8 @@ import org.commonmark.node.*
 fun ComposeMarkdownRenderer(
     node: Node,
     modifier: Modifier = Modifier,
-    listState: LazyListState = rememberLazyListState(),
+    scrollState: androidx.compose.foundation.ScrollState = androidx.compose.foundation.rememberScrollState(),
+    onHeadingPositioned: ((Int, Float) -> Unit)? = null,
     searchQuery: String = "",
     searchCurrentIndex: Int = 0
 ) {
@@ -85,12 +87,6 @@ fun ComposeMarkdownRenderer(
         }
     }
 
-    androidx.compose.runtime.LaunchedEffect(activeBlockIndex) {
-        if (activeBlockIndex >= 0) {
-            listState.animateScrollToItem(activeBlockIndex)
-        }
-    }
-
     val focusRequester = androidx.compose.runtime.remember { FocusRequester() }
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
 
@@ -99,8 +95,7 @@ fun ComposeMarkdownRenderer(
     }
 
     SelectionContainer {
-        LazyColumn(
-            state = listState,
+        Column(
             modifier = modifier
                 .fillMaxSize()
                 .padding(16.dp)
@@ -110,27 +105,42 @@ fun ComposeMarkdownRenderer(
                     if (event.type == KeyEventType.KeyDown) {
                         when (event.key) {
                             Key.DirectionDown -> {
-                                coroutineScope.launch { listState.dispatchRawDelta(50f) }
+                                coroutineScope.launch { scrollState.animateScrollBy(50f) }
                                 true
                             }
                             Key.DirectionUp -> {
-                                coroutineScope.launch { listState.dispatchRawDelta(-50f) }
+                                coroutineScope.launch { scrollState.animateScrollBy(-50f) }
                                 true
                             }
                             Key.Spacebar -> {
-                                coroutineScope.launch { listState.dispatchRawDelta(400f) }
+                                coroutineScope.launch { scrollState.animateScrollBy(400f) }
                                 true
                             }
                             else -> false
                         }
                     } else false
-                },
+                }
+                .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(blocks.size) { i ->
-                val block = blocks[i]
+            blocks.forEachIndexed { i, block ->
                 val matchIndexForBlock = if (i == activeBlockIndex) activeMatchInBlock else -1
-                RenderBlock(block, searchQuery, matchIndexForBlock)
+                val mod = if (block is Heading && onHeadingPositioned != null) {
+                    Modifier.onGloballyPositioned { layoutCoordinates ->
+                        onHeadingPositioned(i, layoutCoordinates.positionInParent().y)
+                        if (i == activeBlockIndex) {
+                            coroutineScope.launch { scrollState.animateScrollTo(layoutCoordinates.positionInParent().y.toInt()) }
+                        }
+                    }
+                } else if (i == activeBlockIndex) {
+                    Modifier.onGloballyPositioned { layoutCoordinates ->
+                        coroutineScope.launch { scrollState.animateScrollTo(layoutCoordinates.positionInParent().y.toInt()) }
+                    }
+                } else Modifier
+                
+                Box(modifier = mod) {
+                    RenderBlock(block, searchQuery, matchIndexForBlock)
+                }
             }
         }
     }

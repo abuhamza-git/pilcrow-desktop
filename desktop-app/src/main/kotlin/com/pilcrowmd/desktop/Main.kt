@@ -138,8 +138,9 @@ fun main(args: Array<String>) = application {
                         )
                     } else {
                         var showTOC by remember { mutableStateOf(false) }
-                        val previewListState = androidx.compose.foundation.lazy.rememberLazyListState()
+                        val previewScrollState = androidx.compose.foundation.rememberScrollState()
                         val editorScrollState = androidx.compose.foundation.rememberScrollState()
+                        val headingPositions = remember { mutableStateMapOf<Int, Float>() }
 
                         // OUTER Column: Toolbar on top, then content row below
                         Column(modifier = Modifier.fillMaxSize()) {
@@ -282,7 +283,10 @@ fun main(args: Array<String>) = application {
                                                             .clickable {
                                                                 if (!isEditorMode) {
                                                                     coroutineScope.launch {
-                                                                        previewListState.animateScrollToItem(heading.listIndex)
+                                                                        val y = headingPositions[heading.listIndex]
+                                                                        if (y != null) {
+                                                                            previewScrollState.animateScrollTo(y.toInt())
+                                                                        }
                                                                     }
                                                                 }
                                                             }
@@ -334,33 +338,15 @@ fun main(args: Array<String>) = application {
                                             ComposeMarkdownRenderer(
                                                 node = documentNode,
                                                 modifier = Modifier.fillMaxHeight().widthIn(max = 1000.dp).padding(horizontal = 32.dp, vertical = 16.dp),
-                                                listState = previewListState,
+                                                scrollState = previewScrollState,
                                                 searchQuery = searchQuery,
-                                                searchCurrentIndex = searchCurrentIndex
+                                                searchCurrentIndex = searchCurrentIndex,
+                                                onHeadingPositioned = { idx, y -> headingPositions[idx] = y }
                                             )
-                                        }
-
-                                        val smoothAdapter = remember(previewListState) {
-                                            object : androidx.compose.foundation.v2.ScrollbarAdapter {
-                                                override val contentSize: Double
-                                                    get() = (previewListState.layoutInfo.totalItemsCount * 100.0).coerceAtLeast(viewportSize)
-                                                
-                                                override val scrollOffset: Double
-                                                    get() = previewListState.firstVisibleItemIndex * 100.0 + previewListState.firstVisibleItemScrollOffset
-                                                    
-                                                override val viewportSize: Double
-                                                    get() = previewListState.layoutInfo.viewportSize.height.toDouble()
-                                                    
-                                                override suspend fun scrollTo(scrollOffset: Double) {
-                                                    val index = (scrollOffset / 100.0).toInt().coerceIn(0, previewListState.layoutInfo.totalItemsCount - 1)
-                                                    val offset = (scrollOffset % 100.0).toInt()
-                                                    previewListState.scrollToItem(index, offset)
-                                                }
-                                            }
                                         }
                                         androidx.compose.foundation.VerticalScrollbar(
                                             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-                                            adapter = smoothAdapter,
+                                            adapter = androidx.compose.foundation.rememberScrollbarAdapter(previewScrollState),
                                             style = androidx.compose.foundation.defaultScrollbarStyle().copy(
                                                 unhoverColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
                                                 hoverColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.50f)
