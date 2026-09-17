@@ -36,7 +36,7 @@ jobs:
 
       - name: Install RPM tools (Linux only)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y rpm fakeroot
+        run: sudo apt-get update && sudo apt-get install -y rpm fakeroot dpkg dpkg-dev
 
       - name: Build and Package
         run: ./gradlew :desktop-app:packageDistributionForCurrentOS --no-daemon
