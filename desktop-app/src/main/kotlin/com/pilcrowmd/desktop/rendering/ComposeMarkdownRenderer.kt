@@ -1,4 +1,8 @@
 package com.pilcrowmd.desktop.rendering
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.pointer.pointerInput
+
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -12,10 +16,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.gestures.animateScrollBy
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
@@ -42,8 +45,7 @@ import org.commonmark.node.*
 fun ComposeMarkdownRenderer(
     node: Node,
     modifier: Modifier = Modifier,
-    scrollState: androidx.compose.foundation.ScrollState = androidx.compose.foundation.rememberScrollState(),
-    onHeadingPositioned: ((Int, Float) -> Unit)? = null,
+    listState: LazyListState = rememberLazyListState(),
     searchQuery: String = "",
     searchCurrentIndex: Int = 0
 ) {
@@ -83,6 +85,12 @@ fun ComposeMarkdownRenderer(
         }
     }
 
+    androidx.compose.runtime.LaunchedEffect(activeBlockIndex) {
+        if (activeBlockIndex >= 0) {
+            listState.animateScrollToItem(activeBlockIndex)
+        }
+    }
+
     val focusRequester = androidx.compose.runtime.remember { FocusRequester() }
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
 
@@ -91,7 +99,8 @@ fun ComposeMarkdownRenderer(
     }
 
     SelectionContainer {
-        Column(
+        LazyColumn(
+            state = listState,
             modifier = modifier
                 .fillMaxSize()
                 .padding(16.dp)
@@ -101,42 +110,27 @@ fun ComposeMarkdownRenderer(
                     if (event.type == KeyEventType.KeyDown) {
                         when (event.key) {
                             Key.DirectionDown -> {
-                                coroutineScope.launch { scrollState.animateScrollBy(50f) }
+                                coroutineScope.launch { listState.dispatchRawDelta(50f) }
                                 true
                             }
                             Key.DirectionUp -> {
-                                coroutineScope.launch { scrollState.animateScrollBy(-50f) }
+                                coroutineScope.launch { listState.dispatchRawDelta(-50f) }
                                 true
                             }
                             Key.Spacebar -> {
-                                coroutineScope.launch { scrollState.animateScrollBy(400f) }
+                                coroutineScope.launch { listState.dispatchRawDelta(400f) }
                                 true
                             }
                             else -> false
                         }
                     } else false
-                }
-                .verticalScroll(scrollState),
+                },
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            blocks.forEachIndexed { i, block ->
+            items(blocks.size) { i ->
+                val block = blocks[i]
                 val matchIndexForBlock = if (i == activeBlockIndex) activeMatchInBlock else -1
-                val mod = if (block is Heading && onHeadingPositioned != null) {
-                    Modifier.onGloballyPositioned { layoutCoordinates ->
-                        onHeadingPositioned(i, layoutCoordinates.positionInParent().y)
-                        if (i == activeBlockIndex) {
-                            coroutineScope.launch { scrollState.animateScrollTo(layoutCoordinates.positionInParent().y.toInt()) }
-                        }
-                    }
-                } else if (i == activeBlockIndex) {
-                    Modifier.onGloballyPositioned { layoutCoordinates ->
-                        coroutineScope.launch { scrollState.animateScrollTo(layoutCoordinates.positionInParent().y.toInt()) }
-                    }
-                } else Modifier
-                
-                Box(modifier = mod) {
-                    RenderBlock(block, searchQuery, matchIndexForBlock)
-                }
+                RenderBlock(block, searchQuery, matchIndexForBlock)
             }
         }
     }
@@ -177,6 +171,7 @@ fun MarkdownHeading(node: Heading, searchQuery: String = "", activeMatchIndex: I
     )
 }
 
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun MarkdownParagraph(node: Paragraph, searchQuery: String = "", activeMatchIndex: Int = -1) {
     val links = mutableListOf<String>()
@@ -188,20 +183,18 @@ fun MarkdownParagraph(node: Paragraph, searchQuery: String = "", activeMatchInde
     findLinks(node)
 
     if (links.isNotEmpty()) {
-        ContextMenuArea(
-            items = {
-                val menuItems = mutableListOf<ContextMenuItem>()
-                links.distinct().forEach { url ->
-                    menuItems.add(ContextMenuItem("Open: $url") {
-                        try { java.awt.Desktop.getDesktop().browse(java.net.URI(url)) } catch (_: Exception) {}
-                    })
-                    menuItems.add(ContextMenuItem("Copy: $url") {
-                        java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(
-                            java.awt.datatransfer.StringSelection(url), null
-                        )
-                    })
+        var expanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+        Box(
+            modifier = Modifier.pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val ptEvent = awaitPointerEvent()
+                        if (ptEvent.type == androidx.compose.ui.input.pointer.PointerEventType.Press && 
+                            ptEvent.button == androidx.compose.ui.input.pointer.PointerButton.Secondary) {
+                            expanded = true
+                        }
+                    }
                 }
-                menuItems
             }
         ) {
             Text(
@@ -209,6 +202,44 @@ fun MarkdownParagraph(node: Paragraph, searchQuery: String = "", activeMatchInde
                 style = MaterialTheme.typography.bodyLarge,
                 fontFamily = FontFamily.Serif
             )
+            androidx.compose.material.CursorDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface).border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.small)
+            ) {
+                links.distinct().forEach { url ->
+                    val isInternal = url.startsWith("#")
+                    if (!isInternal) {
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text("Open Link", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface) },
+                            onClick = {
+                                expanded = false
+                                try {
+                                    val os = System.getProperty("os.name").lowercase()
+                                    if (os.contains("nix") || os.contains("nux")) {
+                                        Runtime.getRuntime().exec(arrayOf("xdg-open", url))
+                                    } else if (os.contains("mac")) {
+                                        Runtime.getRuntime().exec(arrayOf("open", url))
+                                    } else if (os.contains("win")) {
+                                        Runtime.getRuntime().exec(arrayOf("rundll32", "url.dll,FileProtocolHandler", url))
+                                    } else {
+                                        java.awt.Desktop.getDesktop().browse(java.net.URI(url))
+                                    }
+                                } catch (e: Exception) { e.printStackTrace() }
+                            }
+                        )
+                    }
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text(if (isInternal) "Copy Anchor Link" else "Copy Link Address", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface) },
+                        onClick = {
+                            expanded = false
+                            java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(
+                                java.awt.datatransfer.StringSelection(url), null
+                            )
+                        }
+                    )
+                }
+            }
         }
     } else {
         Text(
@@ -218,7 +249,6 @@ fun MarkdownParagraph(node: Paragraph, searchQuery: String = "", activeMatchInde
         )
     }
 }
-
 @Composable
 fun MarkdownCodeBlock(node: FencedCodeBlock) {
     val code = node.literal.trimEnd()
