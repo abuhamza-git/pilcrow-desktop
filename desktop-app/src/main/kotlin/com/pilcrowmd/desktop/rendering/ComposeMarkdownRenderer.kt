@@ -171,83 +171,13 @@ fun MarkdownHeading(node: Heading, searchQuery: String = "", activeMatchIndex: I
     )
 }
 
-@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun MarkdownParagraph(node: Paragraph, searchQuery: String = "", activeMatchIndex: Int = -1) {
-    val links = mutableListOf<String>()
-    fun findLinks(n: Node) {
-        if (n is Link) links.add(n.destination)
-        var child = n.firstChild
-        while (child != null) { findLinks(child); child = child.next }
-    }
-    findLinks(node)
-
-    if (links.isNotEmpty()) {
-        var expanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-        Box(
-            modifier = Modifier.pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val ptEvent = awaitPointerEvent()
-                        if (ptEvent.type == androidx.compose.ui.input.pointer.PointerEventType.Press && 
-                            ptEvent.button == androidx.compose.ui.input.pointer.PointerButton.Secondary) {
-                            expanded = true
-                        }
-                    }
-                }
-            }
-        ) {
-            Text(
-                text = buildInlineText(node, searchQuery, activeMatchIndex),
-                style = MaterialTheme.typography.bodyLarge,
-                fontFamily = FontFamily.Serif
-            )
-            androidx.compose.material.CursorDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.background(MaterialTheme.colorScheme.surface).border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.small)
-            ) {
-                links.distinct().forEach { url ->
-                    val isInternal = url.startsWith("#")
-                    if (!isInternal) {
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text("Open Link", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface) },
-                            onClick = {
-                                expanded = false
-                                try {
-                                    val os = System.getProperty("os.name").lowercase()
-                                    if (os.contains("nix") || os.contains("nux")) {
-                                        Runtime.getRuntime().exec(arrayOf("xdg-open", url))
-                                    } else if (os.contains("mac")) {
-                                        Runtime.getRuntime().exec(arrayOf("open", url))
-                                    } else if (os.contains("win")) {
-                                        Runtime.getRuntime().exec(arrayOf("rundll32", "url.dll,FileProtocolHandler", url))
-                                    } else {
-                                        java.awt.Desktop.getDesktop().browse(java.net.URI(url))
-                                    }
-                                } catch (e: Exception) { e.printStackTrace() }
-                            }
-                        )
-                    }
-                    androidx.compose.material3.DropdownMenuItem(
-                        text = { Text(if (isInternal) "Copy Anchor Link" else "Copy Link Address", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface) },
-                        onClick = {
-                            expanded = false
-                            java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(
-                                java.awt.datatransfer.StringSelection(url), null
-                            )
-                        }
-                    )
-                }
-            }
-        }
-    } else {
-        Text(
-            text = buildInlineText(node, searchQuery, activeMatchIndex),
-            style = MaterialTheme.typography.bodyLarge,
-            fontFamily = FontFamily.Serif
-        )
-    }
+    Text(
+        text = buildInlineText(node, searchQuery, activeMatchIndex),
+        style = MaterialTheme.typography.bodyLarge,
+        fontFamily = FontFamily.Serif
+    )
 }
 @Composable
 fun MarkdownCodeBlock(node: FencedCodeBlock) {
