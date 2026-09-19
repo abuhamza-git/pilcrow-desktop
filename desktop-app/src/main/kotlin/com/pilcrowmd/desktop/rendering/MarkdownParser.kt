@@ -22,6 +22,16 @@ object MarkdownParser {
         .build()
 
     fun parse(markdown: String): Node {
-        return parser.parse(markdown)
+        // 1. Preprocess BLOCK $$ math (on its own lines) into FencedCodeBlocks
+        var preprocessed = markdown.replace(Regex("""(?m)^\s*\$\$\s*\n(.*?)\n^\s*\$\$\s*$""", RegexOption.DOT_MATCHES_ALL)) { matchResult ->
+            "```math\n" + matchResult.groupValues[1].trim() + "\n```"
+        }
+        
+        // 2. Preprocess INLINE $$ math (on the same line) into a special code block string
+        preprocessed = preprocessed.replace(Regex("""\$\$([^\$\n]+?)\$\$""")) { matchResult ->
+            "`math:" + matchResult.groupValues[1].trim() + "`"
+        }
+        
+        return parser.parse(preprocessed)
     }
 }

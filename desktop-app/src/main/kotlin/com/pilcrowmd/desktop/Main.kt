@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.NoteAdd
 
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -19,6 +20,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,317 +38,516 @@ import com.pilcrowmd.desktop.ui.theme.PilcrowDesktopTheme
 import com.pilcrowmd.desktop.util.FilePicker
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+import org.commonmark.node.Node
+import kotlinx.coroutines.swing.Swing
 import java.nio.file.Path
 import kotlin.io.path.name
 
+
+import kotlin.io.path.exists
+import kotlin.io.path.writeText
+import kotlin.io.path.readText
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import java.nio.file.Files
+import java.util.Base64
+import kotlin.io.path.name
 fun main(args: Array<String>) = application {
     val storageManager: StorageManager = remember { DesktopStorageManager() }
     val fileRepository: FileRepository = remember { DesktopFileRepository() }
     val coroutineScope = rememberCoroutineScope()
-
-    // State
-    var currentFilePath by remember { mutableStateOf<Path?>(null) }
-    var fileContent by remember { mutableStateOf("") }
-    var isDirty by remember { mutableStateOf(false) }
-    var isEditorMode by remember { mutableStateOf(false) }
-
-    // Undo / Redo stacks
-    val undoStack = remember { mutableListOf<String>() }
-    val redoStack = remember { mutableListOf<String>() }
-    var isUndoRedoAction by remember { mutableStateOf(false) }
-    var showOpenDialog by remember { mutableStateOf(false) }
-    var showNewDialog by remember { mutableStateOf(false) }
-    var showSettings by remember { mutableStateOf(false) }
-    var showSearchBar by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
-    var searchCurrentIndex by remember { mutableStateOf(0) }
-    val searchMatchCount = remember(fileContent, searchQuery) {
-        if (searchQuery.isEmpty()) 0 else {
-            var count = 0
-            var index = fileContent.indexOf(searchQuery, ignoreCase = true)
-            while (index >= 0) {
-                count++
-                index = fileContent.indexOf(searchQuery, startIndex = index + searchQuery.length, ignoreCase = true)
-            }
-            count
-        }
-    }
-    LaunchedEffect(searchMatchCount) {
-        if (searchMatchCount == 0) searchCurrentIndex = 0
-        else if (searchCurrentIndex >= searchMatchCount) searchCurrentIndex = searchMatchCount - 1
-    }
+    
     val themeMode by storageManager.themeMode.collectAsState(initial = com.pilcrowmd.core.domain.model.ThemeMode.DARK)
-    val lineNumbersEnabled by storageManager.lineNumbersEnabled.collectAsState(initial = false)
     val isDarkTheme = themeMode == com.pilcrowmd.core.domain.model.ThemeMode.DARK
+    val lineNumbersEnabled by storageManager.lineNumbersEnabled.collectAsState(initial = false)
+    val editorFontScale by storageManager.editorFontScale.collectAsState(initial = 1.0f)
+    val previewFontScale by storageManager.previewFontScale.collectAsState(initial = 1.0f)
     val recentFiles by storageManager.recentFiles.collectAsState(initial = emptyList())
+    
+    val openFilePaths by storageManager.openFilePaths.collectAsState(initial = emptyList())
+    val activeTabIndexFlow by storageManager.activeTabIndex.collectAsState(initial = 0)
+    
+    val draftsDir = Path.of(System.getProperty("user.home"), ".config", "pilcrow", "drafts")
+    val tabs = remember { mutableStateListOf<com.pilcrowmd.desktop.state.TabState>() }
+    var activeTabIndex by remember { mutableStateOf(-1) }
+    var showSettings by remember { mutableStateOf(false) }
+    var showUnsavedWarning by remember { mutableStateOf(false) }
+    var tabToClose by remember { mutableStateOf(-1) }
+    var exitPending by remember { mutableStateOf(false) }
 
-    fun openDocument(path: Path) {
-        coroutineScope.launch {
-            fileRepository.readFile(path).onSuccess { content ->
-                currentFilePath = path
-                fileContent = content
-                isDirty = false
-                storageManager.addRecent(com.pilcrowmd.core.storage.RecentFile(path, path.name, System.currentTimeMillis()))
+    // Load tabs once on startup
+    var hasLoadedTabs by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!hasLoadedTabs) {
+            val loadedTabs = openFilePaths.mapNotNull { pathStr ->
+                val p = Path.of(pathStr)
+                if (p.exists()) {
+                    val result = fileRepository.readFile(p)
+                    if (result.isSuccess) {
+                        val draftName = Base64.getUrlEncoder().encodeToString(p.toString().toByteArray()) + ".md"
+                        val draftFile = draftsDir.resolve(draftName)
+                        val content = if (draftFile.exists()) {
+                            draftFile.readText()
+                        } else {
+                            result.getOrNull() ?: ""
+                        }
+                        val tab = com.pilcrowmd.desktop.state.TabState(initialFile = p, initialContent = content)
+                        if (draftFile.exists()) tab.isDirty = true
+                        tab
+                    } else null
+                } else null
+            }
+            if (loadedTabs.isNotEmpty()) {
+                tabs.addAll(loadedTabs)
+                activeTabIndex = activeTabIndexFlow.coerceIn(0, tabs.size - 1)
+            } else if (args.isNotEmpty()) {
+                val p = Path.of(args[0])
+                if (p.exists()) {
+                    val result = fileRepository.readFile(p)
+                    if (result.isSuccess) {
+                        tabs.add(com.pilcrowmd.desktop.state.TabState(initialFile = p, initialContent = result.getOrNull() ?: ""))
+                        activeTabIndex = 0
+                    }
+                }
+            }
+            hasLoadedTabs = true
+        }
+    }
+    
+    
+    // Recover pending WAL saves from FileRepository
+    LaunchedEffect(Unit) {
+        val recovered = fileRepository.recoverPendingSaves().getOrDefault(0)
+        if (recovered > 0) {
+            println("Recovered $recovered pending saves")
+        }
+    }
+
+    // Auto-save loop
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            Files.createDirectories(draftsDir)
+        }
+        while (true) {
+            delay(30_000)
+            val dirtyTabs = tabs.filter { it.isDirty }
+            if (dirtyTabs.isNotEmpty()) {
+                withContext(Dispatchers.IO) {
+                    dirtyTabs.forEach { tab ->
+                        val fileName = if (tab.file != null) {
+                            Base64.getUrlEncoder().encodeToString(tab.file.toString().toByteArray()) + ".md"
+                        } else {
+                            "untitled_${tab.id}.md"
+                        }
+                        try {
+                            draftsDir.resolve(fileName).writeText(tab.content)
+                        } catch (e: Exception) { }
+                    }
+                }
             }
         }
     }
 
-    // Handle CLI argument (open file directly)
-    LaunchedEffect(Unit) {
-        if (args.isNotEmpty()) {
-            val path = Path.of(args[0])
-            openDocument(path)
+    // Save tabs state automatically
+    LaunchedEffect(tabs.toList(), activeTabIndex) {
+        if (hasLoadedTabs) {
+            val paths = tabs.mapNotNull { it.file?.toAbsolutePath()?.toString() }
+            storageManager.saveOpenFilePaths(paths)
+            storageManager.saveActiveTabIndex(activeTabIndex)
+        }
+    }
+
+    val activeTab = if (activeTabIndex in tabs.indices) tabs[activeTabIndex] else null
+
+    fun openFileIntoTab(path: Path) {
+        coroutineScope.launch {
+            val existingIndex = tabs.indexOfFirst { it.file == path }
+            if (existingIndex >= 0) {
+                activeTabIndex = existingIndex
+            } else {
+                val result = fileRepository.readFile(path)
+                if (result.isSuccess) {
+                    val draftName = Base64.getUrlEncoder().encodeToString(path.toString().toByteArray()) + ".md"
+                    val draftFile = draftsDir.resolve(draftName)
+                    val content = if (draftFile.exists()) draftFile.readText() else result.getOrNull() ?: ""
+                    if (activeTab != null && activeTab.isWelcome) {
+                        activeTab.file = path
+                        activeTab.content = content
+                        if (draftFile.exists()) activeTab.isDirty = true
+                        activeTab.isWelcome = false
+                        activeTab.isEditorMode = false
+                    } else {
+                        val tab = com.pilcrowmd.desktop.state.TabState(initialFile = path, initialContent = content)
+                        if (draftFile.exists()) tab.isDirty = true
+                        tabs.add(tab)
+                        activeTabIndex = tabs.lastIndex
+                    }
+                    storageManager.addRecent(com.pilcrowmd.core.storage.RecentFile(path, path.name, System.currentTimeMillis()))
+                }
+            }
+        }
+    }
+
+    suspend fun suspendSaveTab(tab: com.pilcrowmd.desktop.state.TabState): Boolean {
+        if (tab.file != null) {
+            val result = fileRepository.saveFile(tab.file!!, tab.content)
+            if (result.isSuccess) {
+                tab.isDirty = false
+                storageManager.addRecent(com.pilcrowmd.core.storage.RecentFile(tab.file!!, tab.file!!.name, System.currentTimeMillis()))
+                val draftName = Base64.getUrlEncoder().encodeToString(tab.file.toString().toByteArray()) + ".md"
+                try { Files.deleteIfExists(draftsDir.resolve(draftName)) } catch (e: Exception) {}
+                return true
+            }
+        } else {
+            val newPath = FilePicker.showSaveDialog()
+            if (newPath != null) {
+                tab.file = newPath
+                val result = fileRepository.saveFile(newPath, tab.content)
+                if (result.isSuccess) {
+                    tab.isDirty = false
+                    storageManager.addRecent(com.pilcrowmd.core.storage.RecentFile(newPath, newPath.name, System.currentTimeMillis()))
+                    val draftName = Base64.getUrlEncoder().encodeToString(newPath.toString().toByteArray()) + ".md"
+                    try { Files.deleteIfExists(draftsDir.resolve(draftName)) } catch (e: Exception) {}
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    val saveFile: () -> Unit = {
+        coroutineScope.launch {
+            if (activeTab != null) {
+                suspendSaveTab(activeTab)
+            }
         }
     }
 
     val windowTitle = buildString {
         append("PilcrowMD")
-        currentFilePath?.let { path ->
-            append(" — ${path.name}")
-            if (isDirty) append(" •")
+        if (activeTab != null) {
+            append(" — ")
+            append(activeTab.title)
+            if (activeTab.isDirty) append(" *")
         }
     }
 
     Window(
-        onCloseRequest = ::exitApplication,
+        onCloseRequest = {
+            if (tabs.any { it.isDirty }) {
+                exitPending = true
+                showUnsavedWarning = true
+            } else {
+                exitApplication()
+            }
+        },
         title = windowTitle,
-        icon = androidx.compose.ui.res.painterResource("icon.png"),
-        state = rememberWindowState(size = DpSize(1200.dp, 800.dp)),
+        state = rememberWindowState(size = DpSize(1200.dp, 800.dp))
     ) {
         PilcrowDesktopTheme(darkTheme = isDarkTheme) {
-            val snackbarHostState = remember { SnackbarHostState() }
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.background
-            ) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    if (showSettings) {
-                        SettingsScreen(
-                            storageManager = storageManager,
-                            onClose = { showSettings = false }
-                        )
-                    } else if (currentFilePath == null) {
-                        // Welcome screen
-                        WelcomeScreen(
-                            onOpenFile = { showOpenDialog = true },
-                            onNewFile = { showNewDialog = true },
-                            onSettings = { showSettings = true },
-                            recentFiles = recentFiles,
-                            onOpenRecent = { path ->
-                                openDocument(path)
-                            }
-                        )
-                    } else {
-                        var showTOC by remember { mutableStateOf(false) }
-                        val previewScrollState = androidx.compose.foundation.rememberScrollState()
-                        val editorScrollState = androidx.compose.foundation.rememberScrollState()
-                        val headingPositions = remember { mutableStateMapOf<Int, Float>() }
+            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background, contentColor = MaterialTheme.colorScheme.onBackground) {
+                if (showSettings) {
+                    com.pilcrowmd.desktop.SettingsScreen(
+                        storageManager = storageManager,
+                        onClose = { showSettings = false }
+                    )
+                } else {
+                    Column(modifier = Modifier.fillMaxSize()) {
 
-                        // OUTER Column: Toolbar on top, then content row below
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            // Toolbar spans FULL width, always on top
-                            com.pilcrowmd.desktop.ui.PilcrowToolbar(
-                                isEditorMode = isEditorMode,
-                                onModeSelected = { isEditorMode = it },
-                                onOpen = { showOpenDialog = true },
-                                onNew = { showNewDialog = true },
-                                onSettings = { showSettings = true },
-                                onSave = {
-                                    currentFilePath?.let { path ->
-                                        coroutineScope.launch {
-                                            fileRepository.saveFile(path, fileContent).onSuccess {
-                                                isDirty = false
-                                                snackbarHostState.showSnackbar("File saved successfully")
-                                            }.onFailure {
-                                                snackbarHostState.showSnackbar("Failed to save file")
-                                            }
-                                        }
-                                    }
-                                },
-                                onClose = { currentFilePath = null; fileContent = ""; isDirty = false; showTOC = false },
-                                onTOC = { showTOC = !showTOC },
-                                onSearch = { showSearchBar = !showSearchBar },
-                                onExportPdf = {
-                                    val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Export as PDF", java.awt.FileDialog.SAVE)
-                                    currentFilePath?.let {
-                                        dialog.directory = it.parent.toString()
-                                        val currentName = it.fileName.toString()
-                                        dialog.file = if (currentName.endsWith(".md", ignoreCase = true)) {
-                                            currentName.substringBeforeLast(".") + ".pdf"
-                                        } else {
-                                            "$currentName.pdf"
-                                        }
-                                    }
-                                    dialog.isVisible = true
-                                    if (dialog.directory != null && dialog.file != null) {
-                                        var pathStr = java.nio.file.Path.of(dialog.directory, dialog.file).toString()
-                                        if (!pathStr.endsWith(".pdf", ignoreCase = true)) {
-                                            pathStr += ".pdf"
-                                        }
-                                        val path = java.nio.file.Path.of(pathStr)
-                                        coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                            try {
-                                                com.pilcrowmd.desktop.export.PdfExporter.exportToPdf(fileContent, path)
-                                                snackbarHostState.showSnackbar("Exported PDF successfully!")
-                                            } catch (e: Exception) {
-                                                e.printStackTrace()
-                                                snackbarHostState.showSnackbar("Failed to export PDF")
-                                            }
-                                        }
-                                    }
-                                },
-                                onUndo = {
-                                    if (undoStack.isNotEmpty()) {
-                                        redoStack.add(fileContent)
-                                        isUndoRedoAction = true
-                                        fileContent = undoStack.removeAt(undoStack.lastIndex)
-                                    }
-                                },
-                                onRedo = {
-                                    if (redoStack.isNotEmpty()) {
-                                        undoStack.add(fileContent)
-                                        isUndoRedoAction = true
-                                        fileContent = redoStack.removeAt(redoStack.lastIndex)
-                                    }
-                                },
-                                onSaveAs = {
-                                    val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Save a copy", java.awt.FileDialog.SAVE)
-                                    currentFilePath?.let {
-                                        dialog.directory = it.parent.toString()
-                                        dialog.file = it.fileName.toString()
-                                    }
-                                    dialog.isVisible = true
-                                    if (dialog.directory != null && dialog.file != null) {
-                                        val path = java.nio.file.Path.of(dialog.directory, dialog.file)
-                                        coroutineScope.launch {
-                                            fileRepository.saveFile(path, fileContent).onSuccess {
-                                                snackbarHostState.showSnackbar("Copy saved successfully")
-                                            }
-                                        }
-                                    }
-                                },
-                                isDirty = isDirty,
-                                showTOC = showTOC
-                            )
-
-                            // Search bar (below toolbar, above content)
-                            if (showSearchBar) {
-                                com.pilcrowmd.desktop.ui.SearchBar(
-                                    query = searchQuery,
-                                    onQueryChange = { searchQuery = it },
-                                    matchCount = searchMatchCount,
-                                    currentIndex = searchCurrentIndex,
-                                    onPrevious = {
-                                        if (searchMatchCount > 0) {
-                                            searchCurrentIndex = (searchCurrentIndex - 1 + searchMatchCount) % searchMatchCount
-                                        }
-                                    },
-                                    onNext = {
-                                        if (searchMatchCount > 0) {
-                                            searchCurrentIndex = (searchCurrentIndex + 1) % searchMatchCount
-                                        }
-                                    },
-                                    onClose = {
-                                        showSearchBar = false
-                                        searchQuery = ""
-                                    }
-                                )
-                            }
-
-                            // Content row: TOC sidebar + editor/reader
-                            Row(modifier = Modifier.fillMaxSize().weight(1f)) {
-                                // TOC sidebar (starts BELOW toolbar)
-                                if (showTOC) {
-                                    Surface(
-                                        modifier = Modifier.width(280.dp).fillMaxHeight(),
-                                        color = MaterialTheme.colorScheme.surfaceVariant
+                            // Tabs UI
+                            androidx.compose.material3.ScrollableTabRow(
+                                selectedTabIndex = activeTabIndex.coerceAtLeast(0),
+                                edgePadding = 0.dp,
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.fillMaxWidth().height(40.dp)
+                            ) {
+                                tabs.forEachIndexed { index, tab ->
+                                    androidx.compose.material3.Tab(
+                                        selected = activeTabIndex == index,
+                                        onClick = { activeTabIndex = index },
+                                        modifier = Modifier.padding(horizontal = 8.dp)
                                     ) {
-                                        val headings = remember(fileContent) {
-                                            com.pilcrowmd.core.domain.usecase.ParseMarkdownHeadingsUseCase().extractHeadings(fileContent)
-                                        }
-                                        Column(modifier = Modifier.fillMaxSize()) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text(
-                                                text = "Table of Contents",
-                                                style = MaterialTheme.typography.titleMedium,
-                                                modifier = Modifier.padding(16.dp)
+                                                text = tab.title + if (tab.isDirty) " *" else "", 
+                                                style = MaterialTheme.typography.bodyMedium, 
+                                                color = if (activeTabIndex == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                             )
-                                            HorizontalDivider()
-                                            androidx.compose.foundation.lazy.LazyColumn {
-                                                items(headings.size) { i ->
-                                                    val heading = headings[i]
-                                                    val indent = (heading.level - 1) * 16
-                                                    Text(
-                                                        text = heading.text,
-                                                        style = MaterialTheme.typography.bodyMedium,
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .clickable {
-                                                                if (!isEditorMode) {
-                                                                    coroutineScope.launch {
-                                                                        val y = headingPositions[heading.listIndex]
-                                                                        if (y != null) {
-                                                                            previewScrollState.animateScrollTo(y.toInt())
+                                            Spacer(Modifier.width(8.dp))
+                                            Icon(
+                                                androidx.compose.material.icons.Icons.Default.Close,
+                                                contentDescription = "Close Tab",
+                                                modifier = Modifier.size(16.dp).clickable { 
+                                                    if (tab.isDirty) {
+                                                        tabToClose = index
+                                                        showUnsavedWarning = true
+                                                    } else {
+                                                        tabs.removeAt(index)
+                                                        if (activeTabIndex >= tabs.size) {
+                                                            activeTabIndex = tabs.size - 1
+                                                        }
+                                                    }
+                                                },
+                                                tint = if (activeTabIndex == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                                androidx.compose.material3.Tab(
+                                    selected = false,
+                                    onClick = {
+                                        tabs.add(com.pilcrowmd.desktop.state.TabState())
+                                        activeTabIndex = tabs.lastIndex
+                                    },
+                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Add,
+                                        contentDescription = "New Tab",
+                                        modifier = Modifier.padding(vertical = 12.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            
+                            if (activeTab != null) {
+                                if (activeTab.isWelcome) {
+                                    WelcomeScreen(
+                                        onOpenFile = {
+                                            coroutineScope.launch {
+                                                val p = FilePicker.showOpenDialog()
+                                                if (p != null) openFileIntoTab(p)
+                                            }
+                                        },
+                                        onNewFile = {
+                                            activeTab.isWelcome = false
+                                        },
+                                        onSettings = { showSettings = true },
+                                        recentFiles = recentFiles,
+                                        onOpenRecent = { path ->
+                                            openFileIntoTab(path)
+                                        }
+                                    )
+                                } else {
+                                // Toolbar
+                                com.pilcrowmd.desktop.ui.PilcrowToolbar(
+                                    isEditorMode = activeTab.isEditorMode,
+                                    onModeSelected = { activeTab.isEditorMode = it },
+                                    onOpen = { 
+                                        coroutineScope.launch {
+                                            val p = FilePicker.showOpenDialog()
+                                            if (p != null) openFileIntoTab(p)
+                                        }
+                                    },
+                                    onNew = {
+                                        tabs.add(com.pilcrowmd.desktop.state.TabState())
+                                        activeTabIndex = tabs.lastIndex
+                                    },
+                                    onSettings = { showSettings = true },
+                                    onSave = saveFile,
+                                    onClose = {
+                                        if (activeTab.isDirty) {
+                                            tabToClose = activeTabIndex
+                                            showUnsavedWarning = true
+                                        } else {
+                                            tabs.removeAt(activeTabIndex)
+                                            if (activeTabIndex >= tabs.size) {
+                                                activeTabIndex = tabs.size - 1
+                                            }
+                                        }
+                                    },
+                                    onTOC = { activeTab.showTOC = !activeTab.showTOC },
+                                    onSearch = { activeTab.showSearch = !activeTab.showSearch },
+                                    onExportPdf = {
+                                        coroutineScope.launch(Dispatchers.Swing) {
+                                            val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Export as PDF", java.awt.FileDialog.SAVE)
+                                            activeTab.file?.let {
+                                                dialog.directory = it.parent.toString()
+                                                val currentName = it.fileName.toString()
+                                                dialog.file = if (currentName.endsWith(".md", ignoreCase = true)) {
+                                                    currentName.substringBeforeLast(".") + ".pdf"
+                                                } else {
+                                                    "$currentName.pdf"
+                                                }
+                                            }
+                                            dialog.isVisible = true
+                                            if (dialog.directory != null && dialog.file != null) {
+                                                var pathStr = java.nio.file.Path.of(dialog.directory, dialog.file).toString()
+                                                if (!pathStr.endsWith(".pdf", ignoreCase = true)) {
+                                                    pathStr += ".pdf"
+                                                }
+                                                val path = java.nio.file.Path.of(pathStr)
+                                                withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                                    try {
+                                                        com.pilcrowmd.desktop.export.PdfExporter.exportToPdf(activeTab.content, path)
+                                                    } catch (e: Exception) {
+                                                        e.printStackTrace()
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    onUndo = {
+                                        if (activeTab.undoStack.isNotEmpty()) {
+                                            activeTab.redoStack.add(activeTab.content)
+                                            activeTab.isUndoRedoAction = true
+                                            activeTab.content = activeTab.undoStack.removeAt(activeTab.undoStack.lastIndex)
+                                            activeTab.isDirty = true
+                                        }
+                                    },
+                                    onRedo = {
+                                        if (activeTab.redoStack.isNotEmpty()) {
+                                            activeTab.undoStack.add(activeTab.content)
+                                            activeTab.isUndoRedoAction = true
+                                            activeTab.content = activeTab.redoStack.removeAt(activeTab.redoStack.lastIndex)
+                                            activeTab.isDirty = true
+                                        }
+                                    },
+                                    onSaveAs = {
+                                        coroutineScope.launch {
+                                            val newPath = FilePicker.showSaveDialog()
+                                            if (newPath != null) {
+                                                activeTab.file = newPath
+                                                val result = fileRepository.saveFile(newPath, activeTab.content)
+                                                if (result.isSuccess) {
+                                                    activeTab.isDirty = false
+                                                }
+                                            }
+                                        }
+                                    },
+                                    isDirty = activeTab.isDirty,
+                                    showTOC = activeTab.showTOC
+                                )
+                                
+                                // Main layout
+                                if (activeTab.showSearch) {
+                                    com.pilcrowmd.desktop.ui.SearchBar(
+                                        query = activeTab.searchQuery,
+                                        onQueryChange = { activeTab.searchQuery = it; activeTab.searchCurrentIndex = 0 },
+                                        matchCount = if (activeTab.searchQuery.isEmpty()) 0 else {
+                                            var count = 0
+                                            var idx = activeTab.content.indexOf(activeTab.searchQuery, ignoreCase = true)
+                                            while(idx >= 0) {
+                                                count++
+                                                idx = activeTab.content.indexOf(activeTab.searchQuery, startIndex = idx + activeTab.searchQuery.length, ignoreCase = true)
+                                            }
+                                            count
+                                        },
+                                        currentIndex = activeTab.searchCurrentIndex,
+                                        onPrevious = { activeTab.searchCurrentIndex = maxOf(0, activeTab.searchCurrentIndex - 1) },
+                                        onNext = { activeTab.searchCurrentIndex++ },
+                                        onClose = { activeTab.showSearch = false; activeTab.searchQuery = "" }
+                                    )
+                                }
+                                Row(modifier = Modifier.fillMaxSize()) {
+                                    if (activeTab.showTOC) {
+                                        Surface(
+                                            modifier = Modifier.width(280.dp).fillMaxHeight(),
+                                            color = MaterialTheme.colorScheme.surfaceVariant
+                                        ) {
+                                            val headings = remember(activeTab.content) {
+                                                val list = mutableListOf<com.pilcrowmd.core.domain.model.HeadingNode>()
+                                                var blockIndex = 0
+                                                var current: org.commonmark.node.Node? = com.pilcrowmd.desktop.rendering.MarkdownParser.parse(activeTab.content).firstChild
+                                                while (current != null) {
+                                                    if (current is org.commonmark.node.Heading) {
+                                                        val sb = java.lang.StringBuilder()
+                                                        current.accept(object : org.commonmark.node.AbstractVisitor() {
+                                                            override fun visit(text: org.commonmark.node.Text) {
+                                                                sb.append(text.literal)
+                                                            }
+                                                        })
+                                                        list.add(com.pilcrowmd.core.domain.model.HeadingNode(current.level, sb.toString(), blockIndex))
+                                                    }
+                                                    blockIndex++
+                                                    current = current.next
+                                                }
+                                                list
+                                            }
+                                            Column(modifier = Modifier.fillMaxSize()) {
+                                                Text(
+                                                    text = "Table of Contents",
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    modifier = Modifier.padding(16.dp)
+                                                )
+                                                HorizontalDivider()
+                                                androidx.compose.foundation.lazy.LazyColumn {
+                                                    items(headings.size) { i ->
+                                                        val heading = headings[i]
+                                                        val indent = (heading.level - 1) * 16
+                                                        Text(
+                                                            text = heading.text,
+                                                            style = MaterialTheme.typography.bodyMedium,
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .clickable {
+                                                                    if (!activeTab.isEditorMode) {
+                                                                        coroutineScope.launch {
+                                                                            val y = activeTab.headingPositions[heading.listIndex]
+                                                                            if (y != null) {
+                                                                                activeTab.previewScrollState.animateScrollTo(y.toInt())
+                                                                            }
                                                                         }
                                                                     }
                                                                 }
-                                                            }
-                                                            .padding(start = (16 + indent).dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
-                                                    )
+                                                                .padding(start = (16 + indent).dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
+                                        Box(modifier = Modifier.fillMaxHeight().width(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
                                     }
-                                    Box(modifier = Modifier.fillMaxHeight().width(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
-                                }
-
-                                // Main content area
-                                Box(modifier = Modifier.fillMaxSize()) {
-                                    if (isEditorMode) {
-                                        // === EDITOR MODE ===
+                                    
+                                    Box(modifier = Modifier.fillMaxSize()) {
+                                        if (activeTab.isEditorMode) {
                                         EditorScreen(
-                                            content = fileContent,
+                                            content = activeTab.content,
                                             onContentChange = { newContent ->
-                                                if (!isUndoRedoAction) {
-                                                    undoStack.add(fileContent)
-                                                    if (undoStack.size > 100) undoStack.removeAt(0)
-                                                    redoStack.clear()
+                                                if (!activeTab.isUndoRedoAction) {
+                                                    if (activeTab.content != newContent) {
+                                                        activeTab.undoStack.add(activeTab.content)
+                                                        if (activeTab.undoStack.size > 50) activeTab.undoStack.removeAt(0)
+                                                        activeTab.redoStack.clear()
+                                                    }
                                                 }
-                                                isUndoRedoAction = false
-                                                fileContent = newContent
-                                                isDirty = true
+                                                activeTab.isUndoRedoAction = false
+                                                activeTab.content = newContent
+                                                activeTab.isDirty = true
                                             },
                                             showLineNumbers = lineNumbersEnabled,
-                                            searchQuery = searchQuery,
-                                            searchCurrentIndex = searchCurrentIndex,
-                                            scrollState = editorScrollState
+                                            scrollState = activeTab.editorScrollState,
+                                            searchQuery = activeTab.searchQuery,
+                                            searchCurrentIndex = activeTab.searchCurrentIndex
                                         )
                                         androidx.compose.foundation.VerticalScrollbar(
                                             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-                                            adapter = androidx.compose.foundation.rememberScrollbarAdapter(editorScrollState),
+                                            adapter = androidx.compose.foundation.rememberScrollbarAdapter(activeTab.editorScrollState),
                                             style = androidx.compose.foundation.defaultScrollbarStyle().copy(
                                                 unhoverColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
                                                 hoverColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.50f)
                                             )
                                         )
                                     } else {
-                                        // === READER MODE ===
-                                        val documentNode = remember(fileContent) { com.pilcrowmd.desktop.rendering.MarkdownParser.parse(fileContent) }
+                                        val documentNode = remember(activeTab.content) { com.pilcrowmd.desktop.rendering.MarkdownParser.parse(activeTab.content) }
                                         Box(
                                             modifier = Modifier.fillMaxSize(),
                                             contentAlignment = Alignment.TopCenter
                                         ) {
-                                            ComposeMarkdownRenderer(
+                                            com.pilcrowmd.desktop.rendering.ComposeMarkdownRenderer(
                                                 node = documentNode,
                                                 modifier = Modifier.fillMaxHeight().widthIn(max = 1000.dp).padding(horizontal = 32.dp, vertical = 16.dp),
-                                                scrollState = previewScrollState,
-                                                searchQuery = searchQuery,
-                                                searchCurrentIndex = searchCurrentIndex,
-                                                onHeadingPositioned = { idx, y -> headingPositions[idx] = y }
+                                                scrollState = activeTab.previewScrollState,
+                                                searchQuery = activeTab.searchQuery,
+                                                searchCurrentIndex = activeTab.searchCurrentIndex,
+                                                previewFontScale = previewFontScale,
+                                                onHeadingPositioned = { idx, y -> activeTab.headingPositions[idx] = y }
                                             )
                                         }
                                         androidx.compose.foundation.VerticalScrollbar(
                                             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-                                            adapter = androidx.compose.foundation.rememberScrollbarAdapter(previewScrollState),
+                                            adapter = androidx.compose.foundation.rememberScrollbarAdapter(activeTab.previewScrollState),
                                             style = androidx.compose.foundation.defaultScrollbarStyle().copy(
                                                 unhoverColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
                                                 hoverColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.50f)
@@ -354,53 +555,114 @@ fun main(args: Array<String>) = application {
                                         )
                                     }
                                 }
+                                }
+                            }
+                        } else {
+                            WelcomeScreen(
+                                onOpenFile = {
+                                    coroutineScope.launch {
+                                        val p = FilePicker.showOpenDialog()
+                                        if (p != null) openFileIntoTab(p)
+                                    }
+                                },
+                                onNewFile = {
+                                    tabs.add(com.pilcrowmd.desktop.state.TabState())
+                                    activeTabIndex = tabs.lastIndex
+                                },
+                                onSettings = { showSettings = true },
+                                recentFiles = recentFiles,
+                                onOpenRecent = { path ->
+                                    openFileIntoTab(path)
+                                }
+                            )
+                        }
+
+                if (showUnsavedWarning) {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { 
+                            showUnsavedWarning = false
+                            exitPending = false
+                            tabToClose = -1
+                        },
+                        title = { Text("Unsaved Changes") },
+                        text = { Text("You have unsaved changes. Do you want to save them?") },
+                        confirmButton = {
+                            androidx.compose.material3.Button(
+                                onClick = {
+                                    val isExit = exitPending
+                                    val currentTabToClose = tabToClose
+                                    showUnsavedWarning = false
+                                    exitPending = false
+                                    tabToClose = -1
+                                    
+                                    coroutineScope.launch {
+                                        if (isExit) {
+                                            for (tab in tabs.filter { it.isDirty }) {
+                                                suspendSaveTab(tab)
+                                            }
+                                            exitApplication()
+                                        } else if (currentTabToClose >= 0) {
+                                            val tab = tabs[currentTabToClose]
+                                            val success = suspendSaveTab(tab)
+                                            if (success || !tab.isDirty) {
+                                                tabs.removeAt(currentTabToClose)
+                                                if (activeTabIndex >= tabs.size) {
+                                                    activeTabIndex = tabs.size - 1
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ) {
+                                Text("Save")
+                            }
+                        },
+                        dismissButton = {
+                            Row {
+                                androidx.compose.material3.TextButton(
+                                    onClick = {
+                                        showUnsavedWarning = false
+                                        if (exitPending) {
+                                            exitApplication()
+                                        } else if (tabToClose >= 0) {
+                                            val tab = tabs[tabToClose]
+                                            val draftName = if (tab.file != null) {
+                                                Base64.getUrlEncoder().encodeToString(tab.file.toString().toByteArray()) + ".md"
+                                            } else {
+                                                "untitled_${tab.id}.md"
+                                            }
+                                            try { Files.deleteIfExists(draftsDir.resolve(draftName)) } catch (e: Exception) {}
+                                            
+                                            tabs.removeAt(tabToClose)
+                                            if (activeTabIndex >= tabs.size) {
+                                                activeTabIndex = tabs.size - 1
+                                            }
+                                            tabToClose = -1
+                                        }
+                                    }
+                                ) {
+                                    Text("Discard", color = MaterialTheme.colorScheme.error)
+                                }
+                                androidx.compose.material3.TextButton(
+                                    onClick = {
+                                        showUnsavedWarning = false
+                                        exitPending = false
+                                        tabToClose = -1
+                                    }
+                                ) {
+                                    Text("Cancel")
+                                }
                             }
                         }
-                    }
-                    
-                    SnackbarHost(
-                        hostState = snackbarHostState,
-                        modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
                     )
                 }
-            }
-        }
-
-        // File open dialog
-        if (showOpenDialog) {
-            LaunchedEffect(Unit) {
-                val path = FilePicker.showOpenDialog(
-                    title = "Open Markdown File",
-                    extensions = listOf("md", "markdown", "txt")
-                )
-                showOpenDialog = false
-                if (path != null) {
-                    openDocument(path)
-                }
-            }
-        }
-
-        // New file dialog
-        if (showNewDialog) {
-            LaunchedEffect(Unit) {
-                val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Create New Markdown File", java.awt.FileDialog.SAVE)
-                dialog.file = "untitled.md"
-                dialog.isVisible = true
-                showNewDialog = false
-                if (dialog.directory != null && dialog.file != null) {
-                    var fileName = dialog.file
-                    if (!fileName.endsWith(".md", ignoreCase = true)) {
-                        fileName += ".md"
-                    }
-                    val path = java.nio.file.Path.of(dialog.directory, fileName)
-                    fileRepository.saveFile(path, "").onSuccess {
-                        openDocument(path)
-                    }
                 }
             }
         }
     }
 }
+}
+
 
 @Composable
 fun WelcomeScreen(
@@ -430,24 +692,24 @@ fun WelcomeScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Surface(
                         shape = androidx.compose.foundation.shape.CircleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer,
+                        color = androidx.compose.ui.graphics.Color.Transparent,
                         modifier = Modifier.size(80.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = "¶",
-                                style = MaterialTheme.typography.displayMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource("icon.png"),
+                                contentDescription = "PilcrowMD Logo",
+                                modifier = Modifier.fillMaxSize()
                             )
                         }
                     }
                     Text(
-                        text = "PilcrowMD",
-                        style = MaterialTheme.typography.displaySmall,
+                        text = "PilcrowMD Desktop\nCommunity Edition",
+                        style = MaterialTheme.typography.headlineLarge,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "A beautiful Markdown reader & editor.",
+                        text = "A private, distraction-free Markdown reader & editor.\n(Unofficial Community Port)",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -557,7 +819,8 @@ fun EditorScreen(
     showLineNumbers: Boolean,
     searchQuery: String = "",
     searchCurrentIndex: Int = 0,
-    scrollState: androidx.compose.foundation.ScrollState = androidx.compose.foundation.rememberScrollState()
+    scrollState: androidx.compose.foundation.ScrollState = androidx.compose.foundation.rememberScrollState(),
+    editorFontScale: Float = 1.0f
 ) {
     var textState by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(content)) }
 
@@ -639,7 +902,8 @@ fun EditorScreen(
                     style = MaterialTheme.typography.bodyMedium.copy(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.End
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                        fontSize = MaterialTheme.typography.bodyMedium.fontSize * editorFontScale
                     ),
                     modifier = Modifier.padding(end = 16.dp).widthIn(min = 24.dp)
                 )
@@ -656,7 +920,8 @@ fun EditorScreen(
                 modifier = Modifier.weight(1f).bringIntoViewRequester(bringIntoViewRequester),
                 textStyle = MaterialTheme.typography.bodyMedium.copy(
                     color = MaterialTheme.colorScheme.onBackground,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    fontSize = MaterialTheme.typography.bodyMedium.fontSize * editorFontScale
                 )
             )
         }

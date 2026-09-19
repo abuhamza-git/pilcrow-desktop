@@ -21,10 +21,14 @@ data class ScrollAnchor(val index: Int = 0, val offset: Int = 0)
  * Abstraction for persistence (preferences, content, etc.).
  */
 interface StorageManager {
+    val openFilePaths: Flow<List<String>>
+    val activeTabIndex: Flow<Int>
     val lastFilePath: Flow<Path?>
     val lineNumbersEnabled: Flow<Boolean>
     val recentFiles: Flow<List<RecentFile>>
 
+    suspend fun saveOpenFilePaths(paths: List<String>)
+    suspend fun saveActiveTabIndex(index: Int)
     suspend fun saveLastFilePath(path: Path)
     suspend fun clearLastFilePath()
     suspend fun setLineNumbersEnabled(enabled: Boolean)

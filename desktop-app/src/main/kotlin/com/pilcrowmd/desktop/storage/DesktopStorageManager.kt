@@ -57,6 +57,12 @@ class DesktopStorageManager : StorageManager {
     private val _recentFiles = MutableStateFlow<List<RecentFile>>(emptyList())
     override val recentFiles: StateFlow<List<RecentFile>> = _recentFiles.asStateFlow()
 
+    private val _openFilePaths = MutableStateFlow<List<String>>(emptyList())
+    override val openFilePaths: StateFlow<List<String>> = _openFilePaths.asStateFlow()
+
+    private val _activeTabIndex = MutableStateFlow(0)
+    override val activeTabIndex: StateFlow<Int> = _activeTabIndex.asStateFlow()
+
     private val _lastFilePath = MutableStateFlow<Path?>(null)
     override val lastFilePath: StateFlow<Path?> = _lastFilePath.asStateFlow()
 
@@ -78,7 +84,9 @@ class DesktopStorageManager : StorageManager {
         val lineNumbersEnabled: Boolean = true,
         val fontSetId: String = "source",
         val mermaidCloudEnabled: Boolean = false,
-        val lastFilePathStr: String? = null
+        val lastFilePathStr: String? = null,
+        val openFilePaths: List<String> = emptyList(),
+        val activeTabIndex: Int = 0
     )
 
     @Serializable
@@ -100,6 +108,8 @@ class DesktopStorageManager : StorageManager {
                 _fontSetId.value = settings.fontSetId
                 _mermaidCloudEnabled.value = settings.mermaidCloudEnabled
                 _lastFilePath.value = settings.lastFilePathStr?.let { Path.of(it) }
+                _openFilePaths.value = settings.openFilePaths
+                _activeTabIndex.value = settings.activeTabIndex
             }
         } catch (e: Exception) {
             System.err.println("Failed to load settings: ${e.message}")
@@ -116,7 +126,9 @@ class DesktopStorageManager : StorageManager {
                 lineNumbersEnabled = _lineNumbersEnabled.value,
                 fontSetId = _fontSetId.value,
                 mermaidCloudEnabled = _mermaidCloudEnabled.value,
-                lastFilePathStr = _lastFilePath.value?.toAbsolutePath()?.toString()
+                lastFilePathStr = _lastFilePath.value?.toAbsolutePath()?.toString(),
+                openFilePaths = _openFilePaths.value,
+                activeTabIndex = _activeTabIndex.value
             )
             settingsFile.writeText(json.encodeToString(settings))
         } catch (e: Exception) {
@@ -222,6 +234,16 @@ class DesktopStorageManager : StorageManager {
 
     override suspend fun setThemeMode(mode: ThemeMode) {
         _themeMode.value = mode
+        saveSettings()
+    }
+
+    override suspend fun saveOpenFilePaths(paths: List<String>) {
+        _openFilePaths.value = paths
+        saveSettings()
+    }
+
+    override suspend fun saveActiveTabIndex(index: Int) {
+        _activeTabIndex.value = index
         saveSettings()
     }
 }

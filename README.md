@@ -1,70 +1,127 @@
-# PilcrowMD Desktop
+# PilcrowMD Desktop — Community Edition
 
-**PilcrowMD Desktop** is a beautiful, offline, distraction-free Markdown reader and editor for Windows and Linux. 
+An unofficial, community-built desktop edition of **PilcrowMD** for Windows and Linux.
 
-This project is a complete native desktop port of the original [PilcrowMD Android app](https://github.com/pilcrowmd/pilcrow), built using **JetBrains Compose Desktop**. It brings the elegant, dual-pane Markdown experience from mobile directly to your computer.
+PilcrowMD Desktop brings the private, distraction-free Markdown reading and editing experience of the original [PilcrowMD](https://github.com/pilcrowmd/pilcrow) Android application to desktop platforms.
+
+> **Community project:** This is an independent, unofficial desktop adaptation of PilcrowMD. It is not an official release of, affiliated with, or endorsed by the original PilcrowMD project or its developer.
 
 ## ✨ Features
 
-- **Cross-Platform Native Apps:** Runs cleanly as an `.msi`/`.exe` on Windows, and `.rpm`/`.deb`/`.AppImage` on Linux.
-- **Split Reader & Editor Modes:** Seamlessly switch between writing raw Markdown and reading beautifully typeset documents.
-- **Syntax Highlighting & Formatting:** Full support for standard Markdown, code blocks, tables, and strikethroughs.
-- **In-document Search:** Fast search with match highlighting and auto-scrolling to results.
-- **PDF Export:** Export your Markdown directly to a paginated, print-styled PDF (with full support for tables and code blocks).
-- **Customizable Typography:** Independent font scaling for both the reader and editor, with built-in font families.
-- **Dark & Light Themes:** Toggle instantly between a default dark theme and a warm-cream light theme.
-- **Native OS Integration:** Registers as the default handler for `.md` files in your operating system.
+- **Windows & Linux** — Native desktop packages for both platforms.
+- **Reader & Editor Modes** — Switch seamlessly between editing raw Markdown and reading beautifully rendered documents.
+- **Markdown Support** — Headings, lists, tables, code blocks, strikethrough, and other common Markdown features.
+- **Syntax Highlighting** — Read and edit code blocks with syntax-aware formatting.
+- **In-document Search** — Search documents with match highlighting and navigation.
+- **PDF Export** — Export Markdown documents to paginated, print-friendly PDFs.
+- **Customizable Typography** — Independent font scaling for the reader and editor.
+- **Dark & Light Themes** — Choose between a dark theme and warm-cream light theme.
+- **Native File Integration** — Open `.md` files directly from your operating system.
+- **Offline & Private** — Your Markdown files remain on your computer.
 
 ## 📸 Screenshots
-
-<div align="center">
 
 | Reader Mode | Editor Mode |
 |:---:|:---:|
 | <img src="docs/screenshots/desktop-reader.png" width="400" alt="Pilcrow Desktop Reader Mode"> | <img src="docs/screenshots/desktop-editor.png" width="400" alt="Pilcrow Desktop Editor Mode"> |
 
-</div>
-
 ## 🚀 Download & Install
 
-The easiest way to install PilcrowMD Desktop is to download the installer for your operating system from the **[Releases](https://github.com/abuhamza-git/pilcrow-desktop/releases)** page.
+Download the latest Community Edition release from the [Releases](https://github.com/abuhamza-git/pilcrow-desktop/releases) page.
 
-- **Windows:** Download the `.msi` installer.
-- **Linux:** Download the `.deb` (Debian/Ubuntu), `.rpm` (Fedora/RedHat), or use the portable `.AppImage`.
+### Windows
 
-*(Note: The GitHub Actions workflow automatically builds these installers on every release!)*
+Download the `.msi` installer from the latest release.
+
+### Linux
+
+Packages are available in formats including:
+
+- `.deb` — Debian / Ubuntu
+- `.rpm` — Fedora / Red Hat
+- `.AppImage` — Portable Linux package
 
 ## 🛠️ Tech Stack & Architecture
 
-PilcrowMD Desktop was built by extracting the pure-Kotlin domain logic from the original Android app into a shared `core` module, and building a brand new desktop UI shell around it.
+PilcrowMD Desktop — Community Edition builds upon the open-source PilcrowMD project while introducing a dedicated desktop application built with **JetBrains Compose Desktop**.
 
-| Area | Choice |
-|---|---|
+Shared pure-Kotlin functionality from the original project is used where appropriate, while the desktop interface and desktop-specific functionality are developed separately.
+
+| Area | Technology |
+| --- | --- |
 | Language | Kotlin 2.3 |
 | UI Framework | JetBrains Compose Desktop |
-| Markdown Parsing | `commonmark-java` (with GFM extensions) |
+| Markdown Parsing | `commonmark-java` with GFM extensions |
 | PDF Generation | `openhtmltopdf` |
 | State Management | Coroutines & Flow |
-| Persistence | JSON-backed StorageManager (`~/.config/pilcrow/`) |
+| Persistence | JSON-backed `StorageManager` |
 | Build Tool | Gradle (Kotlin DSL) |
 
-## 🏗️ Build it yourself
+## 🏗️ Build It Yourself
 
-Requirements: JDK 17+
+### Requirements
+
+JDK 17+
+
+Clone the repository:
 
 ```bash
 git clone https://github.com/abuhamza-git/pilcrow-desktop.git
 cd pilcrow-desktop
+```
 
-# Run the app locally for testing
+Run the desktop application:
+
+```bash
 ./gradlew :desktop-app:run
+```
 
-# Package native distributions (deb, rpm, appimage) on Linux
+Package a native distribution for your current operating system:
+
+```bash
 ./gradlew :desktop-app:packageDistributionForCurrentOS
 ```
 
+## 🌱 Community Edition
+
+This project exists to explore and provide a community-maintained desktop experience based on PilcrowMD.
+
+The desktop edition may develop features, UI patterns, integrations, and workflows specifically designed for Windows and Linux while preserving the core philosophy that makes PilcrowMD useful: a focused, private, offline Markdown experience.
+
+Issues, ideas, bug reports, and contributions related to the **Community Edition** are welcome in this repository.
+
+## 💙 Original PilcrowMD
+
+This project is based on the open-source **PilcrowMD** Android application created by **pleree**.
+
+Original project:
+
+**https://github.com/pilcrowmd/pilcrow**
+
+PilcrowMD is a private, native Markdown reader and editor for Android with no ads, tracking, or required network access for reading local files.
+
+All credit for the original PilcrowMD project and its Android implementation belongs to its original author and contributors.
+
+This Community Edition is maintained independently and should not be confused with an official PilcrowMD desktop release.
+
 ## 📜 License
 
-Like the original Android app, PilcrowMD Desktop is licensed under the **GNU General Public License v3.0 or later (GPL-3.0-or-later)**. Copyright © 2026.
+PilcrowMD Desktop — Community Edition is distributed under the **GNU General Public License v3.0 or later (GPL-3.0-or-later)**, consistent with the license of the original PilcrowMD project.
 
-The app bundles third-party dependencies and fonts which are documented under `LICENSES.md` and surfaced in-app.
+Copyright for code originating from PilcrowMD remains with its respective original copyright holders.
+
+New code and modifications introduced by contributors to this Community Edition remain attributed to their respective authors.
+
+Third-party dependencies, fonts, and other bundled components may be subject to their own licenses. See [`LICENSES.md`](LICENSES.md) for details.
+
+See [`LICENSE`](LICENSE) for the full GPL license terms.
+
+---
+
+### Trademark & Affiliation Notice
+
+**PilcrowMD** is the name used by the original PilcrowMD project.
+
+**PilcrowMD Desktop — Community Edition is an independent community project and is not an official desktop release of PilcrowMD. It is not affiliated with, sponsored by, or endorsed by the original PilcrowMD developer.**
+
+The “Community Edition” designation is used to distinguish this project from the original application and any official PilcrowMD desktop software that may be released in the future.

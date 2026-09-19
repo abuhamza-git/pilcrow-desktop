@@ -8,6 +8,11 @@ plugins {
 }
 
 dependencies {
+    // Testing
+    testImplementation(kotlin("test"))
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+
     implementation(project(":core"))
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
@@ -29,6 +34,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.9.0")
 
+    // Math Rendering
+    implementation("org.scilab.forge:jlatexmath:1.0.7")
+
     // JSON for settings
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 }
@@ -38,7 +46,7 @@ compose.desktop {
         mainClass = "com.pilcrowmd.desktop.MainKt"
         nativeDistributions {
             packageName = "PilcrowMD"
-            packageVersion = "1.0.6"
+            packageVersion = "1.0.7"
             description = "A beautiful Markdown reader & editor"
             modules("java.instrument", "jdk.unsupported")
 
@@ -61,4 +69,8 @@ compose.desktop {
 
 kotlin {
     jvmToolchain(17)
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
 }

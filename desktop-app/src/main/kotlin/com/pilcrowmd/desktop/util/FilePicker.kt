@@ -4,6 +4,7 @@
 package com.pilcrowmd.desktop.util
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.swing.Swing
 import kotlinx.coroutines.withContext
 import java.awt.FileDialog
 import java.awt.Frame
@@ -18,7 +19,7 @@ object FilePicker {
     suspend fun showOpenDialog(
         title: String = "Open File",
         extensions: List<String> = listOf("md", "markdown", "txt")
-    ): Path? = withContext(Dispatchers.IO) {
+    ): Path? = withContext(Dispatchers.Swing) {
         val dialog = FileDialog(null as Frame?, title, FileDialog.LOAD)
         dialog.isVisible = true
         
@@ -32,7 +33,7 @@ object FilePicker {
     suspend fun showSaveDialog(
         title: String = "Save As",
         suggestedName: String = "untitled.md"
-    ): Path? = withContext(Dispatchers.IO) {
+    ): Path? = withContext(Dispatchers.Swing) {
         val dialog = FileDialog(null as Frame?, title, FileDialog.SAVE)
         dialog.file = suggestedName
         dialog.isVisible = true

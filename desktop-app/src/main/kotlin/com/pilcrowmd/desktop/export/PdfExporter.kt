@@ -74,9 +74,9 @@ object PdfExporter {
                     /* Table styling — the key fix */
                     table {
                         border-collapse: collapse;
-                        width: 100%;
-                        margin: 1em 0;
-                        table-layout: fixed;
+                        width: auto;
+                        max-width: 100%;
+                        margin: 1.5em 0;
                         page-break-inside: auto;
                     }
                     thead {
@@ -87,12 +87,13 @@ object PdfExporter {
                         page-break-after: auto;
                     }
                     th, td {
-                        border: 1px solid #aaa;
-                        padding: 6px 10px;
+                        border: 1px solid #d0d7de;
+                        padding: 8px 14px;
                         text-align: left;
-                        vertical-align: top;
-                        word-wrap: break-word;
-                        overflow-wrap: break-word;
+                        vertical-align: middle;
+                    }
+                    td > p {
+                        margin: 0;
                     }
                     th {
                         background-color: #e8e8e8;

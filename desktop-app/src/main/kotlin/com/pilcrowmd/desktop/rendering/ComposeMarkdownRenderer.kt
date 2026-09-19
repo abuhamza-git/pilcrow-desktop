@@ -49,9 +49,29 @@ fun ComposeMarkdownRenderer(
     scrollState: androidx.compose.foundation.ScrollState = androidx.compose.foundation.rememberScrollState(),
     onHeadingPositioned: ((Int, Float) -> Unit)? = null,
     searchQuery: String = "",
-    searchCurrentIndex: Int = 0
+    searchCurrentIndex: Int = 0,
+    previewFontScale: Float = 1.0f
 ) {
     val blocks = mutableListOf<Node>()
+    // Create scaled typography
+    val currentTypography = MaterialTheme.typography
+    val scaledTypography = androidx.compose.material3.Typography(
+        displayLarge = currentTypography.displayLarge.copy(fontSize = currentTypography.displayLarge.fontSize * previewFontScale),
+        displayMedium = currentTypography.displayMedium.copy(fontSize = currentTypography.displayMedium.fontSize * previewFontScale),
+        displaySmall = currentTypography.displaySmall.copy(fontSize = currentTypography.displaySmall.fontSize * previewFontScale),
+        headlineLarge = currentTypography.headlineLarge.copy(fontSize = currentTypography.headlineLarge.fontSize * previewFontScale),
+        headlineMedium = currentTypography.headlineMedium.copy(fontSize = currentTypography.headlineMedium.fontSize * previewFontScale),
+        headlineSmall = currentTypography.headlineSmall.copy(fontSize = currentTypography.headlineSmall.fontSize * previewFontScale),
+        titleLarge = currentTypography.titleLarge.copy(fontSize = currentTypography.titleLarge.fontSize * previewFontScale),
+        titleMedium = currentTypography.titleMedium.copy(fontSize = currentTypography.titleMedium.fontSize * previewFontScale),
+        titleSmall = currentTypography.titleSmall.copy(fontSize = currentTypography.titleSmall.fontSize * previewFontScale),
+        bodyLarge = currentTypography.bodyLarge.copy(fontSize = currentTypography.bodyLarge.fontSize * previewFontScale),
+        bodyMedium = currentTypography.bodyMedium.copy(fontSize = currentTypography.bodyMedium.fontSize * previewFontScale),
+        bodySmall = currentTypography.bodySmall.copy(fontSize = currentTypography.bodySmall.fontSize * previewFontScale),
+        labelLarge = currentTypography.labelLarge.copy(fontSize = currentTypography.labelLarge.fontSize * previewFontScale),
+        labelMedium = currentTypography.labelMedium.copy(fontSize = currentTypography.labelMedium.fontSize * previewFontScale),
+        labelSmall = currentTypography.labelSmall.copy(fontSize = currentTypography.labelSmall.fontSize * previewFontScale)
+    )
     var current = node.firstChild
     while (current != null) {
         blocks.add(current)
@@ -143,8 +163,8 @@ fun ComposeMarkdownRenderer(
                 }
             }
         }
+        }
     }
-}
 
 @Composable
 fun RenderBlock(node: Node, searchQuery: String = "", activeMatchIndex: Int = -1) {
@@ -175,24 +195,63 @@ fun MarkdownHeading(node: Heading, searchQuery: String = "", activeMatchIndex: I
         else -> MaterialTheme.typography.bodyLarge
     }
     Text(
-        text = buildInlineText(node, searchQuery, activeMatchIndex),
+        text = buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(node), searchQuery, activeMatchIndex),
         style = style,
         modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
     )
 }
 
 @Composable
+fun MarkdownParagraphTextBuffer(buffer: List<Node>, searchQuery: String, activeMatchIndex: Int) {
+    if (buffer.isNotEmpty()) {
+        Text(
+            text = buildInlineText(buffer, searchQuery, activeMatchIndex),
+            style = MaterialTheme.typography.bodyLarge,
+            fontFamily = FontFamily.Serif
+        )
+    }
+}
+
+@Composable
 fun MarkdownParagraph(node: Paragraph, searchQuery: String = "", activeMatchIndex: Int = -1) {
-    Text(
-        text = buildInlineText(node, searchQuery, activeMatchIndex),
-        style = MaterialTheme.typography.bodyLarge,
-        fontFamily = FontFamily.Serif
-    )
+    Column(modifier = Modifier.fillMaxWidth()) {
+        val children = getChildren(node)
+        val textNodeBuffer = mutableListOf<Node>()
+        
+        for (current in children) {
+            if (current is org.commonmark.node.Image) {
+                MarkdownParagraphTextBuffer(textNodeBuffer.toList(), searchQuery, activeMatchIndex)
+                textNodeBuffer.clear()
+                
+                AsyncMarkdownImage(
+                    url = current.destination,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
+                )
+            } else {
+                textNodeBuffer.add(current)
+            }
+        }
+        MarkdownParagraphTextBuffer(textNodeBuffer, searchQuery, activeMatchIndex)
+    }
+}
+
+fun getChildren(node: Node): List<Node> {
+    val list = mutableListOf<Node>()
+    var current = node.firstChild
+    while (current != null) {
+        list.add(current)
+        current = current.next
+    }
+    return list
 }
 @Composable
 fun MarkdownCodeBlock(node: FencedCodeBlock) {
     val code = node.literal.trimEnd()
     val language = node.info ?: ""
+    if (language.equals("math", ignoreCase = true) || language.equals("latex", ignoreCase = true)) {
+        LatexBlock(content = code)
+        return
+    }
     val highlighted = SyntaxHighlighter.highlight(code, language)
     val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
 
@@ -343,7 +402,7 @@ fun MarkdownTable(node: TableBlock, searchQuery: String = "", activeMatchIndex: 
                                 ) {
                                     val textWeight = if (cell.isHeader) FontWeight.Bold else FontWeight.Normal
                                     Text(
-                                        text = buildInlineText(cell, searchQuery, activeMatchIndex),
+                                        text = buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(cell), searchQuery, activeMatchIndex),
                                         fontWeight = textWeight,
                                         style = MaterialTheme.typography.bodyMedium
                                     )
@@ -373,25 +432,24 @@ fun MarkdownFrontMatter(node: YamlFrontMatterBlock) {
     }
 }
 
-fun buildInlineText(node: Node, searchQuery: String = "", activeMatchIndex: Int = -1): androidx.compose.ui.text.AnnotatedString {
+fun buildInlineText(nodes: List<Node>, searchQuery: String = "", activeMatchIndex: Int = -1): androidx.compose.ui.text.AnnotatedString {
     val builder = androidx.compose.ui.text.AnnotatedString.Builder()
-    var current = node.firstChild
-    while (current != null) {
+    for (current in nodes) {
         when (current) {
             is Text -> builder.append(current.literal)
             is Emphasis -> {
                 builder.pushStyle(SpanStyle(fontStyle = FontStyle.Italic))
-                builder.append(buildInlineText(current, searchQuery, activeMatchIndex))
+                builder.append(buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(current), searchQuery, activeMatchIndex))
                 builder.pop()
             }
             is StrongEmphasis -> {
                 builder.pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
-                builder.append(buildInlineText(current, searchQuery, activeMatchIndex))
+                builder.append(buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(current), searchQuery, activeMatchIndex))
                 builder.pop()
             }
             is Strikethrough -> {
                 builder.pushStyle(SpanStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough))
-                builder.append(buildInlineText(current, searchQuery, activeMatchIndex))
+                builder.append(buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(current), searchQuery, activeMatchIndex))
                 builder.pop()
             }
             is Code -> {
@@ -401,7 +459,7 @@ fun buildInlineText(node: Node, searchQuery: String = "", activeMatchIndex: Int 
             }
             is Link -> {
                 builder.pushStyle(SpanStyle(color = Color(0xFF1976D2), textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline))
-                builder.append(buildInlineText(current, searchQuery, activeMatchIndex))
+                builder.append(buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(current), searchQuery, activeMatchIndex))
                 builder.pop()
             }
             is Image -> {
@@ -409,11 +467,10 @@ fun buildInlineText(node: Node, searchQuery: String = "", activeMatchIndex: Int 
             }
             else -> {
                 if (current.firstChild != null) {
-                    builder.append(buildInlineText(current, searchQuery, activeMatchIndex))
+                    builder.append(buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(current), searchQuery, activeMatchIndex))
                 }
             }
         }
-        current = current.next
     }
     
     val result = builder.toAnnotatedString()
