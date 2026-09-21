@@ -2,20 +2,25 @@
 
 All notable changes to Pilcrow are documented here.
 
+## [1.0.10] - 2026-09-22
+### Fixed
+- Fixed an issue where local relative image paths in Markdown files failed to load in the desktop application.
+### Changed
+- Completely revamped README.md with accurate features, limitations, and architectural overview for the Community Edition.
+
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [1.0.10] - 2026-09-21
-### Fixed
-- Fixed Arabic layout direction issues (bullet points appearing on the left, text aligning to the left). The Editor and Reader now fully wrap the structural layout in RTL mode when Arabic text is detected.
 
 
 ## [1.0.9] - 2026-09-21
 ### Added
 - Native Right-to-Left (RTL) rendering support for documents (Arabic, Hebrew, Persian, etc.).
 - Bundled 'Amiri' font (a highly-readable, classic Arabic book font) seamlessly integrated as an automatic fallback into all typography themes so Arabic text always looks beautiful.
+- Native Linux File Pickers: Completely eradicated legacy Java AWT dialogs. The app now natively integrates with GNOME (via zenity) and KDE (via kdialog) for a sleek, modern file open/save experience.
+- Fixed PDF Exporter: Integrated ICU4J Bidi support and embedded Amiri fonts to export flawless PDFs containing Arabic text without broken characters.
 
 
 ## [1.0.8] - 2026-09-21

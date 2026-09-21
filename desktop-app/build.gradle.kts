@@ -19,7 +19,8 @@ dependencies {
     implementation(compose.materialIconsExtended)
 
     // PDF Export
-    implementation("com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10")
+    implementation("com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.9")
+    implementation("com.openhtmltopdf:openhtmltopdf-rtl-support:1.0.9")
     implementation("org.commonmark:commonmark-ext-heading-anchor:0.24.0")
 
     // Markdown parsing
