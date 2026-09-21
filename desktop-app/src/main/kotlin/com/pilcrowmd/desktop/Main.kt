@@ -539,6 +539,8 @@ fun main(args: Array<String>) {
                                     }
                                     
                                     Box(modifier = Modifier.fillMaxSize()) {
+                                        val layoutDir = if (activeTab.content.isRtl()) androidx.compose.ui.unit.LayoutDirection.Rtl else androidx.compose.ui.unit.LayoutDirection.Ltr
+                                        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides layoutDir) {
                                         if (activeTab.isEditorMode) {
                                         EditorScreen(
                                             content = activeTab.content,
@@ -597,6 +599,7 @@ fun main(args: Array<String>) {
                                         )
                                     }
                                 }
+                                    }
                                 }
                             }
                         } else {
@@ -938,7 +941,8 @@ fun EditorScreen(
                         },
                         textAlign = androidx.compose.ui.text.style.TextAlign.End,
                         fontSize = MaterialTheme.typography.bodyMedium.fontSize * editorFontScale,
-                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * editorFontScale
+                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * editorFontScale,
+                        textDirection = androidx.compose.ui.text.style.TextDirection.Content
                     ),
                     modifier = Modifier.padding(end = 16.dp).widthIn(min = 24.dp)
                 )
@@ -960,9 +964,19 @@ fun EditorScreen(
                             else -> com.pilcrowmd.desktop.ui.theme.jetbrainsMonoFamily
                         },
                     fontSize = MaterialTheme.typography.bodyMedium.fontSize * editorFontScale,
-                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * editorFontScale
+                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * editorFontScale,
+                        textDirection = androidx.compose.ui.text.style.TextDirection.Content
                 )
             )
         }
     }
+}
+
+fun String.isRtl(): Boolean {
+    for (char in this) {
+        if (char.isLetter()) {
+            return char in '֑'..'߿' || char in 'ࢠ'..'ࣿ' || char in 'יִ'..'﷿' || char in 'ﹰ'..'﻿'
+        }
+    }
+    return false
 }

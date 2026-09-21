@@ -1,4 +1,6 @@
 package com.pilcrowmd.desktop.rendering
+
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.pointer.pointerInput
@@ -23,6 +25,9 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,21 +74,21 @@ fun ComposeMarkdownRenderer(
 
     val currentTypography = MaterialTheme.typography
     val scaledTypography = androidx.compose.material3.Typography(
-        displayLarge = currentTypography.displayLarge.copy(fontFamily = readingFamily, fontSize = currentTypography.displayLarge.fontSize * previewFontScale, lineHeight = currentTypography.displayLarge.lineHeight * previewFontScale),
-        displayMedium = currentTypography.displayMedium.copy(fontFamily = readingFamily, fontSize = currentTypography.displayMedium.fontSize * previewFontScale, lineHeight = currentTypography.displayMedium.lineHeight * previewFontScale),
-        displaySmall = currentTypography.displaySmall.copy(fontFamily = readingFamily, fontSize = currentTypography.displaySmall.fontSize * previewFontScale, lineHeight = currentTypography.displaySmall.lineHeight * previewFontScale),
-        headlineLarge = currentTypography.headlineLarge.copy(fontFamily = readingFamily, fontSize = currentTypography.headlineLarge.fontSize * previewFontScale, lineHeight = currentTypography.headlineLarge.lineHeight * previewFontScale),
-        headlineMedium = currentTypography.headlineMedium.copy(fontFamily = readingFamily, fontSize = currentTypography.headlineMedium.fontSize * previewFontScale, lineHeight = currentTypography.headlineMedium.lineHeight * previewFontScale),
-        headlineSmall = currentTypography.headlineSmall.copy(fontFamily = readingFamily, fontSize = currentTypography.headlineSmall.fontSize * previewFontScale, lineHeight = currentTypography.headlineSmall.lineHeight * previewFontScale),
-        titleLarge = currentTypography.titleLarge.copy(fontFamily = readingFamily, fontSize = currentTypography.titleLarge.fontSize * previewFontScale, lineHeight = currentTypography.titleLarge.lineHeight * previewFontScale),
-        titleMedium = currentTypography.titleMedium.copy(fontFamily = readingFamily, fontSize = currentTypography.titleMedium.fontSize * previewFontScale, lineHeight = currentTypography.titleMedium.lineHeight * previewFontScale),
-        titleSmall = currentTypography.titleSmall.copy(fontFamily = readingFamily, fontSize = currentTypography.titleSmall.fontSize * previewFontScale, lineHeight = currentTypography.titleSmall.lineHeight * previewFontScale),
-        bodyLarge = currentTypography.bodyLarge.copy(fontFamily = readingFamily, fontSize = currentTypography.bodyLarge.fontSize * previewFontScale, lineHeight = currentTypography.bodyLarge.lineHeight * previewFontScale),
-        bodyMedium = currentTypography.bodyMedium.copy(fontFamily = readingFamily, fontSize = currentTypography.bodyMedium.fontSize * previewFontScale, lineHeight = currentTypography.bodyMedium.lineHeight * previewFontScale),
-        bodySmall = currentTypography.bodySmall.copy(fontFamily = readingFamily, fontSize = currentTypography.bodySmall.fontSize * previewFontScale, lineHeight = currentTypography.bodySmall.lineHeight * previewFontScale),
-        labelLarge = currentTypography.labelLarge.copy(fontFamily = readingFamily, fontSize = currentTypography.labelLarge.fontSize * previewFontScale, lineHeight = currentTypography.labelLarge.lineHeight * previewFontScale),
-        labelMedium = currentTypography.labelMedium.copy(fontFamily = readingFamily, fontSize = currentTypography.labelMedium.fontSize * previewFontScale, lineHeight = currentTypography.labelMedium.lineHeight * previewFontScale),
-        labelSmall = currentTypography.labelSmall.copy(fontFamily = readingFamily, fontSize = currentTypography.labelSmall.fontSize * previewFontScale, lineHeight = currentTypography.labelSmall.lineHeight * previewFontScale)
+        displayLarge = currentTypography.displayLarge.copy(fontFamily = readingFamily, fontSize = currentTypography.displayLarge.fontSize * previewFontScale, lineHeight = currentTypography.displayLarge.lineHeight * previewFontScale, textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+        displayMedium = currentTypography.displayMedium.copy(fontFamily = readingFamily, fontSize = currentTypography.displayMedium.fontSize * previewFontScale, lineHeight = currentTypography.displayMedium.lineHeight * previewFontScale, textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+        displaySmall = currentTypography.displaySmall.copy(fontFamily = readingFamily, fontSize = currentTypography.displaySmall.fontSize * previewFontScale, lineHeight = currentTypography.displaySmall.lineHeight * previewFontScale, textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+        headlineLarge = currentTypography.headlineLarge.copy(fontFamily = readingFamily, fontSize = currentTypography.headlineLarge.fontSize * previewFontScale, lineHeight = currentTypography.headlineLarge.lineHeight * previewFontScale, textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+        headlineMedium = currentTypography.headlineMedium.copy(fontFamily = readingFamily, fontSize = currentTypography.headlineMedium.fontSize * previewFontScale, lineHeight = currentTypography.headlineMedium.lineHeight * previewFontScale, textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+        headlineSmall = currentTypography.headlineSmall.copy(fontFamily = readingFamily, fontSize = currentTypography.headlineSmall.fontSize * previewFontScale, lineHeight = currentTypography.headlineSmall.lineHeight * previewFontScale, textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+        titleLarge = currentTypography.titleLarge.copy(fontFamily = readingFamily, fontSize = currentTypography.titleLarge.fontSize * previewFontScale, lineHeight = currentTypography.titleLarge.lineHeight * previewFontScale, textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+        titleMedium = currentTypography.titleMedium.copy(fontFamily = readingFamily, fontSize = currentTypography.titleMedium.fontSize * previewFontScale, lineHeight = currentTypography.titleMedium.lineHeight * previewFontScale, textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+        titleSmall = currentTypography.titleSmall.copy(fontFamily = readingFamily, fontSize = currentTypography.titleSmall.fontSize * previewFontScale, lineHeight = currentTypography.titleSmall.lineHeight * previewFontScale, textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+        bodyLarge = currentTypography.bodyLarge.copy(fontFamily = readingFamily, fontSize = currentTypography.bodyLarge.fontSize * previewFontScale, lineHeight = currentTypography.bodyLarge.lineHeight * previewFontScale, textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+        bodyMedium = currentTypography.bodyMedium.copy(fontFamily = readingFamily, fontSize = currentTypography.bodyMedium.fontSize * previewFontScale, lineHeight = currentTypography.bodyMedium.lineHeight * previewFontScale, textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+        bodySmall = currentTypography.bodySmall.copy(fontFamily = readingFamily, fontSize = currentTypography.bodySmall.fontSize * previewFontScale, lineHeight = currentTypography.bodySmall.lineHeight * previewFontScale, textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+        labelLarge = currentTypography.labelLarge.copy(fontFamily = readingFamily, fontSize = currentTypography.labelLarge.fontSize * previewFontScale, lineHeight = currentTypography.labelLarge.lineHeight * previewFontScale, textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+        labelMedium = currentTypography.labelMedium.copy(fontFamily = readingFamily, fontSize = currentTypography.labelMedium.fontSize * previewFontScale, lineHeight = currentTypography.labelMedium.lineHeight * previewFontScale, textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+        labelSmall = currentTypography.labelSmall.copy(fontFamily = readingFamily, fontSize = currentTypography.labelSmall.fontSize * previewFontScale, lineHeight = currentTypography.labelSmall.lineHeight * previewFontScale, textDirection = androidx.compose.ui.text.style.TextDirection.Content)
     )
     var current = node.firstChild
     while (current != null) {
@@ -555,4 +560,13 @@ fun extractPlainText(node: Node): String {
         current = current.next
     }
     return sb.toString()
+}
+
+fun String.isRtl(): Boolean {
+    for (char in this) {
+        if (char.isLetter()) {
+            return char in '֑'..'߿' || char in 'ࢠ'..'ࣿ' || char in 'יִ'..'﷿' || char in 'ﹰ'..'﻿'
+        }
+    }
+    return false
 }

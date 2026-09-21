@@ -10,11 +10,15 @@ import androidx.compose.ui.unit.sp
 val sourceSerif4Family = FontFamily(
     Font("fonts/source_serif_4_regular.ttf", FontWeight.Normal),
     Font("fonts/source_serif_4_bold.ttf", FontWeight.Bold),
+    Font("fonts/amiri_regular.ttf", FontWeight.Normal),
+    Font("fonts/amiri_bold.ttf", FontWeight.Bold),
 )
 
 val jetbrainsMonoFamily = FontFamily(
     Font("fonts/jetbrains_mono_regular.ttf", FontWeight.Normal),
     Font("fonts/jetbrains_mono_bold.ttf", FontWeight.Bold),
+    Font("fonts/amiri_regular.ttf", FontWeight.Normal),
+    Font("fonts/amiri_bold.ttf", FontWeight.Bold),
 )
 
 const val PreviewLineHeightMultiplier = 1.35f
@@ -25,6 +29,7 @@ object PilcrowTypography {
         fontSize = 17.sp,
         fontWeight = FontWeight.Normal,
         lineHeight = 1.7.em,
+        textDirection = androidx.compose.ui.text.style.TextDirection.Content
     )
 
     val h1Style = TextStyle(
@@ -32,6 +37,7 @@ object PilcrowTypography {
         fontSize = 29.sp,
         fontWeight = FontWeight.Bold,
         lineHeight = 1.2.em,
+        textDirection = androidx.compose.ui.text.style.TextDirection.Content
     )
 
     val h2Style = TextStyle(
@@ -39,6 +45,7 @@ object PilcrowTypography {
         fontSize = 23.sp,
         fontWeight = FontWeight.Bold,
         lineHeight = 1.2.em,
+        textDirection = androidx.compose.ui.text.style.TextDirection.Content
     )
 
     val h3Style = TextStyle(
@@ -46,6 +53,7 @@ object PilcrowTypography {
         fontSize = 19.sp,
         fontWeight = FontWeight.Bold,
         lineHeight = 1.2.em,
+        textDirection = androidx.compose.ui.text.style.TextDirection.Content
     )
 
     val codeBlockStyle = TextStyle(
@@ -53,6 +61,7 @@ object PilcrowTypography {
         fontSize = 14.sp,
         fontWeight = FontWeight.Normal,
         lineHeight = 1.7.em,
+        textDirection = androidx.compose.ui.text.style.TextDirection.Content
     )
 
     val editorStyle = TextStyle(
@@ -60,12 +69,14 @@ object PilcrowTypography {
         fontSize = 14.sp,
         fontWeight = FontWeight.Normal,
         lineHeight = 1.75.em,
+        textDirection = androidx.compose.ui.text.style.TextDirection.Content
     )
 
     val inlineCodeStyle = TextStyle(
         fontFamily = sourceSerif4Family,
         fontSize = 15.3.sp,
         fontWeight = FontWeight.Normal,
+                textDirection = androidx.compose.ui.text.style.TextDirection.Content
     )
 
     const val EDITOR_BASE_FONT_SIZE_SP: Float = 13f
@@ -78,14 +89,20 @@ object PilcrowTypography {
 val merriweatherFamily = FontFamily(
     Font("fonts/merriweather_regular.ttf", FontWeight.Normal),
     Font("fonts/merriweather_bold.ttf", FontWeight.Bold),
+    Font("fonts/amiri_regular.ttf", FontWeight.Normal),
+    Font("fonts/amiri_bold.ttf", FontWeight.Bold),
 )
 
 val atkinsonFamily = FontFamily(
     Font("fonts/atkinson_hyperlegible_regular.ttf", FontWeight.Normal),
     Font("fonts/atkinson_hyperlegible_bold.ttf", FontWeight.Bold),
+    Font("fonts/amiri_regular.ttf", FontWeight.Normal),
+    Font("fonts/amiri_bold.ttf", FontWeight.Bold),
 )
 
 val ibmPlexMonoFamily = FontFamily(
     Font("fonts/ibm_plex_mono_regular.ttf", FontWeight.Normal),
     Font("fonts/ibm_plex_mono_bold.ttf", FontWeight.Bold),
+    Font("fonts/amiri_regular.ttf", FontWeight.Normal),
+    Font("fonts/amiri_bold.ttf", FontWeight.Bold),
 )

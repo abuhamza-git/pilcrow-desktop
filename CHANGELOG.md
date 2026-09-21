@@ -7,6 +7,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.10] - 2026-09-21
+### Fixed
+- Fixed Arabic layout direction issues (bullet points appearing on the left, text aligning to the left). The Editor and Reader now fully wrap the structural layout in RTL mode when Arabic text is detected.
+
+
+## [1.0.9] - 2026-09-21
+### Added
+- Native Right-to-Left (RTL) rendering support for documents (Arabic, Hebrew, Persian, etc.).
+- Bundled 'Amiri' font (a highly-readable, classic Arabic book font) seamlessly integrated as an automatic fallback into all typography themes so Arabic text always looks beautiful.
+
+
 ## [1.0.8] - 2026-09-21
 ### Fixed
 - Restored original mobile typography sets (Classic, Book, Modern).
