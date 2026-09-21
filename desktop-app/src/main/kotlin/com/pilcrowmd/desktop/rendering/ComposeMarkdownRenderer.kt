@@ -57,7 +57,8 @@ fun ComposeMarkdownRenderer(
     searchCurrentIndex: Int = 0,
     previewFontScale: Float = 1.0f,
     mermaidCloudEnabled: Boolean = false,
-    fontSetId: String = "source"
+    fontSetId: String = "source",
+    basePath: java.nio.file.Path? = null
 ) {
     val blocks = mutableListOf<Node>()
     // Create scaled typography
@@ -177,8 +178,11 @@ fun ComposeMarkdownRenderer(
                     }
                 } else Modifier
                 
-                Box(modifier = mod) {
-                    RenderBlock(block, searchQuery, matchIndexForBlock, mermaidCloudEnabled, fontSetId)
+                val layoutDir = if (extractPlainText(block).isRtl()) LayoutDirection.Rtl else LayoutDirection.Ltr
+                CompositionLocalProvider(LocalLayoutDirection provides layoutDir) {
+                    Box(modifier = mod.fillMaxWidth()) {
+                        RenderBlock(block, searchQuery, matchIndexForBlock, mermaidCloudEnabled, fontSetId, basePath)
+                    }
                 }
             }
         }
@@ -187,10 +191,10 @@ fun ComposeMarkdownRenderer(
     }
 
 @Composable
-fun RenderBlock(node: Node, searchQuery: String = "", activeMatchIndex: Int = -1, mermaidCloudEnabled: Boolean = false, fontSetId: String = "source") {
+fun RenderBlock(node: Node, searchQuery: String = "", activeMatchIndex: Int = -1, mermaidCloudEnabled: Boolean = false, fontSetId: String = "source", basePath: java.nio.file.Path? = null) {
     when (node) {
         is Heading -> MarkdownHeading(node, searchQuery, activeMatchIndex, fontSetId)
-        is Paragraph -> MarkdownParagraph(node, searchQuery, activeMatchIndex, fontSetId)
+        is Paragraph -> MarkdownParagraph(node, searchQuery, activeMatchIndex, fontSetId, basePath)
         is FencedCodeBlock -> MarkdownCodeBlock(node, mermaidCloudEnabled, fontSetId)
         is BlockQuote -> MarkdownBlockQuote(node, searchQuery, activeMatchIndex, fontSetId)
         is ListBlock -> MarkdownList(node, searchQuery, activeMatchIndex, fontSetId)
@@ -233,7 +237,7 @@ fun MarkdownParagraphTextBuffer(buffer: List<Node>, searchQuery: String, activeM
 }
 
 @Composable
-fun MarkdownParagraph(node: Paragraph, searchQuery: String = "", activeMatchIndex: Int = -1, fontSetId: String = "source") {
+fun MarkdownParagraph(node: Paragraph, searchQuery: String = "", activeMatchIndex: Int = -1, fontSetId: String = "source", basePath: java.nio.file.Path? = null) {
     Column(modifier = Modifier.fillMaxWidth()) {
         val children = getChildren(node)
         val textNodeBuffer = mutableListOf<Node>()
@@ -245,7 +249,8 @@ fun MarkdownParagraph(node: Paragraph, searchQuery: String = "", activeMatchInde
                 
                 AsyncMarkdownImage(
                     url = current.destination,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                    basePath = basePath
                 )
             } else {
                 textNodeBuffer.add(current)

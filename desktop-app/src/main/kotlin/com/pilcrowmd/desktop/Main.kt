@@ -398,24 +398,23 @@ fun main(args: Array<String>) {
                                     onTOC = { activeTab.showTOC = !activeTab.showTOC },
                                     onSearch = { activeTab.showSearch = !activeTab.showSearch },
                                     onExportPdf = {
-                                        coroutineScope.launch(Dispatchers.Swing) {
-                                            val dialog = java.awt.FileDialog(null as java.awt.Frame?, "Export as PDF", java.awt.FileDialog.SAVE)
-                                            activeTab.file?.let {
-                                                dialog.directory = it.parent.toString()
+                                        coroutineScope.launch {
+                                            val suggestedName = activeTab.file?.let {
                                                 val currentName = it.fileName.toString()
-                                                dialog.file = if (currentName.endsWith(".md", ignoreCase = true)) {
+                                                if (currentName.endsWith(".md", ignoreCase = true)) {
                                                     currentName.substringBeforeLast(".") + ".pdf"
                                                 } else {
                                                     "$currentName.pdf"
                                                 }
-                                            }
-                                            dialog.isVisible = true
-                                            if (dialog.directory != null && dialog.file != null) {
-                                                var pathStr = java.nio.file.Path.of(dialog.directory, dialog.file).toString()
-                                                if (!pathStr.endsWith(".pdf", ignoreCase = true)) {
-                                                    pathStr += ".pdf"
-                                                }
-                                                val path = java.nio.file.Path.of(pathStr)
+                                            } ?: "untitled.pdf"
+                                            
+                                            val path = com.pilcrowmd.desktop.util.FilePicker.showSaveDialog(
+                                                title = "Export as PDF",
+                                                suggestedName = suggestedName,
+                                                defaultExtension = ".pdf"
+                                            )
+                                            
+                                            if (path != null) {
                                                 withContext(kotlinx.coroutines.Dispatchers.IO) {
                                                     try {
                                                         com.pilcrowmd.desktop.export.PdfExporter.exportToPdf(activeTab.content, path)
@@ -539,8 +538,6 @@ fun main(args: Array<String>) {
                                     }
                                     
                                     Box(modifier = Modifier.fillMaxSize()) {
-                                        val layoutDir = if (activeTab.content.isRtl()) androidx.compose.ui.unit.LayoutDirection.Rtl else androidx.compose.ui.unit.LayoutDirection.Ltr
-                                        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides layoutDir) {
                                         if (activeTab.isEditorMode) {
                                         EditorScreen(
                                             content = activeTab.content,
@@ -586,7 +583,8 @@ fun main(args: Array<String>) {
                                                 previewFontScale = previewFontScale,
                                                 fontSetId = fontSetId,
                                                 mermaidCloudEnabled = mermaidEnabled,
-                                                onHeadingPositioned = { idx, y -> activeTab.headingPositions[idx] = y }
+                                                onHeadingPositioned = { idx, y -> activeTab.headingPositions[idx] = y },
+                                                basePath = activeTab.file?.parent
                                             )
                                         }
                                         androidx.compose.foundation.VerticalScrollbar(
@@ -598,7 +596,6 @@ fun main(args: Array<String>) {
                                             )
                                         )
                                     }
-                                }
                                     }
                                 }
                             }

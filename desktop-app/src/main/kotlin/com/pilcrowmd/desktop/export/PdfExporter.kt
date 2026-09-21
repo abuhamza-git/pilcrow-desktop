@@ -6,6 +6,11 @@ import org.commonmark.parser.Parser
 import org.commonmark.renderer.html.HtmlRenderer
 import java.nio.file.Path
 import kotlin.io.path.outputStream
+import com.openhtmltopdf.bidi.support.ICUBidiReorderer
+import com.openhtmltopdf.bidi.support.ICUBidiSplitter
+import com.openhtmltopdf.extend.FSSupplier
+import java.io.InputStream
+
 
 object PdfExporter {
     fun exportToPdf(markdownContent: String, outputPath: Path) {
@@ -22,7 +27,7 @@ object PdfExporter {
             <head>
                 <style>
                     body {
-                        font-family: sans-serif;
+                        font-family: sans-serif, "Amiri";
                         line-height: 1.6;
                         margin: 0;
                         padding: 2em;
@@ -118,18 +123,38 @@ object PdfExporter {
                     a { color: #1976D2; text-decoration: underline; }
                 </style>
             </head>
-            <body>
+            <body ${if (markdownContent.isRtl()) "dir='rtl'" else ""}>
                 $htmlBody
             </body>
             </html>
         """.trimIndent()
         
         outputPath.outputStream().use { os ->
-            val builder = PdfRendererBuilder()
+                        val builder = PdfRendererBuilder()
             builder.useFastMode()
+            
+            // RTL and Bidi support
+            builder.useUnicodeBidiSplitter(ICUBidiSplitter.ICUBidiSplitterFactory())
+            builder.useUnicodeBidiReorderer(ICUBidiReorderer())
+            
+            // Fonts
+            val amiriReg = FSSupplier<InputStream> { PdfExporter::class.java.getResourceAsStream("/fonts/amiri_regular.ttf") }
+            val amiriBold = FSSupplier<InputStream> { PdfExporter::class.java.getResourceAsStream("/fonts/amiri_bold.ttf") }
+            builder.useFont(amiriReg, "Amiri")
+            builder.useFont(amiriBold, "Amiri", 700, com.openhtmltopdf.outputdevice.helper.BaseRendererBuilder.FontStyle.NORMAL, true)
+            
             builder.withHtmlContent(fullHtml, "file:///")
             builder.toStream(os)
             builder.run()
         }
     }
+}
+
+fun String.isRtl(): Boolean {
+    for (char in this) {
+        if (char.isLetter()) {
+            return char in '֑'..'߿' || char in 'ࢠ'..'ࣿ' || char in 'יִ'..'﷿' || char in 'ﹰ'..'﻿'
+        }
+    }
+    return false
 }

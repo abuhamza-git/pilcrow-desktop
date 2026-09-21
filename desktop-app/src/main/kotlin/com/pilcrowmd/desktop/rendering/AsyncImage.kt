@@ -21,7 +21,7 @@ import java.io.File
 import java.nio.file.Path
 
 @Composable
-fun AsyncMarkdownImage(url: String, modifier: Modifier = Modifier) {
+fun AsyncMarkdownImage(url: String, modifier: Modifier = Modifier, basePath: Path? = null) {
     var bitmap by remember(url) { mutableStateOf<ImageBitmap?>(null) }
     var error by remember(url) { mutableStateOf(false) }
 
@@ -33,7 +33,12 @@ fun AsyncMarkdownImage(url: String, modifier: Modifier = Modifier) {
                 } else if (url.startsWith("file://")) {
                     ImageIO.read(File(java.net.URI(url)))
                 } else {
-                    ImageIO.read(File(url))
+                    val file = if (basePath != null && !File(url).isAbsolute) {
+                        basePath.resolve(url).normalize().toFile()
+                    } else {
+                        File(url)
+                    }
+                    ImageIO.read(file)
                 }
                 
                 if (image != null) {
