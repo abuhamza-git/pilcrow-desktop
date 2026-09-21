@@ -50,27 +50,40 @@ fun ComposeMarkdownRenderer(
     onHeadingPositioned: ((Int, Float) -> Unit)? = null,
     searchQuery: String = "",
     searchCurrentIndex: Int = 0,
-    previewFontScale: Float = 1.0f
+    previewFontScale: Float = 1.0f,
+    mermaidCloudEnabled: Boolean = false,
+    fontSetId: String = "source"
 ) {
     val blocks = mutableListOf<Node>()
     // Create scaled typography
+    val readingFamily = when (fontSetId) {
+        "book" -> com.pilcrowmd.desktop.ui.theme.merriweatherFamily
+        "modern" -> com.pilcrowmd.desktop.ui.theme.atkinsonFamily
+        else -> com.pilcrowmd.desktop.ui.theme.sourceSerif4Family
+    }
+    
+    val monoFamily = when (fontSetId) {
+        "book" -> com.pilcrowmd.desktop.ui.theme.ibmPlexMonoFamily
+        else -> com.pilcrowmd.desktop.ui.theme.jetbrainsMonoFamily
+    }
+
     val currentTypography = MaterialTheme.typography
     val scaledTypography = androidx.compose.material3.Typography(
-        displayLarge = currentTypography.displayLarge.copy(fontSize = currentTypography.displayLarge.fontSize * previewFontScale),
-        displayMedium = currentTypography.displayMedium.copy(fontSize = currentTypography.displayMedium.fontSize * previewFontScale),
-        displaySmall = currentTypography.displaySmall.copy(fontSize = currentTypography.displaySmall.fontSize * previewFontScale),
-        headlineLarge = currentTypography.headlineLarge.copy(fontSize = currentTypography.headlineLarge.fontSize * previewFontScale),
-        headlineMedium = currentTypography.headlineMedium.copy(fontSize = currentTypography.headlineMedium.fontSize * previewFontScale),
-        headlineSmall = currentTypography.headlineSmall.copy(fontSize = currentTypography.headlineSmall.fontSize * previewFontScale),
-        titleLarge = currentTypography.titleLarge.copy(fontSize = currentTypography.titleLarge.fontSize * previewFontScale),
-        titleMedium = currentTypography.titleMedium.copy(fontSize = currentTypography.titleMedium.fontSize * previewFontScale),
-        titleSmall = currentTypography.titleSmall.copy(fontSize = currentTypography.titleSmall.fontSize * previewFontScale),
-        bodyLarge = currentTypography.bodyLarge.copy(fontSize = currentTypography.bodyLarge.fontSize * previewFontScale),
-        bodyMedium = currentTypography.bodyMedium.copy(fontSize = currentTypography.bodyMedium.fontSize * previewFontScale),
-        bodySmall = currentTypography.bodySmall.copy(fontSize = currentTypography.bodySmall.fontSize * previewFontScale),
-        labelLarge = currentTypography.labelLarge.copy(fontSize = currentTypography.labelLarge.fontSize * previewFontScale),
-        labelMedium = currentTypography.labelMedium.copy(fontSize = currentTypography.labelMedium.fontSize * previewFontScale),
-        labelSmall = currentTypography.labelSmall.copy(fontSize = currentTypography.labelSmall.fontSize * previewFontScale)
+        displayLarge = currentTypography.displayLarge.copy(fontFamily = readingFamily, fontSize = currentTypography.displayLarge.fontSize * previewFontScale, lineHeight = currentTypography.displayLarge.lineHeight * previewFontScale),
+        displayMedium = currentTypography.displayMedium.copy(fontFamily = readingFamily, fontSize = currentTypography.displayMedium.fontSize * previewFontScale, lineHeight = currentTypography.displayMedium.lineHeight * previewFontScale),
+        displaySmall = currentTypography.displaySmall.copy(fontFamily = readingFamily, fontSize = currentTypography.displaySmall.fontSize * previewFontScale, lineHeight = currentTypography.displaySmall.lineHeight * previewFontScale),
+        headlineLarge = currentTypography.headlineLarge.copy(fontFamily = readingFamily, fontSize = currentTypography.headlineLarge.fontSize * previewFontScale, lineHeight = currentTypography.headlineLarge.lineHeight * previewFontScale),
+        headlineMedium = currentTypography.headlineMedium.copy(fontFamily = readingFamily, fontSize = currentTypography.headlineMedium.fontSize * previewFontScale, lineHeight = currentTypography.headlineMedium.lineHeight * previewFontScale),
+        headlineSmall = currentTypography.headlineSmall.copy(fontFamily = readingFamily, fontSize = currentTypography.headlineSmall.fontSize * previewFontScale, lineHeight = currentTypography.headlineSmall.lineHeight * previewFontScale),
+        titleLarge = currentTypography.titleLarge.copy(fontFamily = readingFamily, fontSize = currentTypography.titleLarge.fontSize * previewFontScale, lineHeight = currentTypography.titleLarge.lineHeight * previewFontScale),
+        titleMedium = currentTypography.titleMedium.copy(fontFamily = readingFamily, fontSize = currentTypography.titleMedium.fontSize * previewFontScale, lineHeight = currentTypography.titleMedium.lineHeight * previewFontScale),
+        titleSmall = currentTypography.titleSmall.copy(fontFamily = readingFamily, fontSize = currentTypography.titleSmall.fontSize * previewFontScale, lineHeight = currentTypography.titleSmall.lineHeight * previewFontScale),
+        bodyLarge = currentTypography.bodyLarge.copy(fontFamily = readingFamily, fontSize = currentTypography.bodyLarge.fontSize * previewFontScale, lineHeight = currentTypography.bodyLarge.lineHeight * previewFontScale),
+        bodyMedium = currentTypography.bodyMedium.copy(fontFamily = readingFamily, fontSize = currentTypography.bodyMedium.fontSize * previewFontScale, lineHeight = currentTypography.bodyMedium.lineHeight * previewFontScale),
+        bodySmall = currentTypography.bodySmall.copy(fontFamily = readingFamily, fontSize = currentTypography.bodySmall.fontSize * previewFontScale, lineHeight = currentTypography.bodySmall.lineHeight * previewFontScale),
+        labelLarge = currentTypography.labelLarge.copy(fontFamily = readingFamily, fontSize = currentTypography.labelLarge.fontSize * previewFontScale, lineHeight = currentTypography.labelLarge.lineHeight * previewFontScale),
+        labelMedium = currentTypography.labelMedium.copy(fontFamily = readingFamily, fontSize = currentTypography.labelMedium.fontSize * previewFontScale, lineHeight = currentTypography.labelMedium.lineHeight * previewFontScale),
+        labelSmall = currentTypography.labelSmall.copy(fontFamily = readingFamily, fontSize = currentTypography.labelSmall.fontSize * previewFontScale, lineHeight = currentTypography.labelSmall.lineHeight * previewFontScale)
     )
     var current = node.firstChild
     while (current != null) {
@@ -114,6 +127,7 @@ fun ComposeMarkdownRenderer(
         focusRequester.requestFocus()
     }
 
+    MaterialTheme(typography = scaledTypography) {
     SelectionContainer {
         Column(
             modifier = modifier
@@ -159,24 +173,25 @@ fun ComposeMarkdownRenderer(
                 } else Modifier
                 
                 Box(modifier = mod) {
-                    RenderBlock(block, searchQuery, matchIndexForBlock)
+                    RenderBlock(block, searchQuery, matchIndexForBlock, mermaidCloudEnabled, fontSetId)
                 }
             }
         }
         }
     }
+    }
 
 @Composable
-fun RenderBlock(node: Node, searchQuery: String = "", activeMatchIndex: Int = -1) {
+fun RenderBlock(node: Node, searchQuery: String = "", activeMatchIndex: Int = -1, mermaidCloudEnabled: Boolean = false, fontSetId: String = "source") {
     when (node) {
-        is Heading -> MarkdownHeading(node, searchQuery, activeMatchIndex)
-        is Paragraph -> MarkdownParagraph(node, searchQuery, activeMatchIndex)
-        is FencedCodeBlock -> MarkdownCodeBlock(node)
-        is BlockQuote -> MarkdownBlockQuote(node, searchQuery, activeMatchIndex)
-        is ListBlock -> MarkdownList(node, searchQuery, activeMatchIndex)
+        is Heading -> MarkdownHeading(node, searchQuery, activeMatchIndex, fontSetId)
+        is Paragraph -> MarkdownParagraph(node, searchQuery, activeMatchIndex, fontSetId)
+        is FencedCodeBlock -> MarkdownCodeBlock(node, mermaidCloudEnabled, fontSetId)
+        is BlockQuote -> MarkdownBlockQuote(node, searchQuery, activeMatchIndex, fontSetId)
+        is ListBlock -> MarkdownList(node, searchQuery, activeMatchIndex, fontSetId)
         is ThematicBreak -> HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
         is YamlFrontMatterBlock -> MarkdownFrontMatter(node)
-        is TableBlock -> MarkdownTable(node, searchQuery, activeMatchIndex)
+        is TableBlock -> MarkdownTable(node, searchQuery, activeMatchIndex, fontSetId)
         else -> {
             Text("Unsupported block: \${node.javaClass.simpleName}")
         }
@@ -184,7 +199,7 @@ fun RenderBlock(node: Node, searchQuery: String = "", activeMatchIndex: Int = -1
 }
 
 @Composable
-fun MarkdownHeading(node: Heading, searchQuery: String = "", activeMatchIndex: Int = -1) {
+fun MarkdownHeading(node: Heading, searchQuery: String = "", activeMatchIndex: Int = -1, fontSetId: String = "source") {
     val style = when (node.level) {
         1 -> MaterialTheme.typography.displayLarge
         2 -> MaterialTheme.typography.displayMedium
@@ -195,7 +210,7 @@ fun MarkdownHeading(node: Heading, searchQuery: String = "", activeMatchIndex: I
         else -> MaterialTheme.typography.bodyLarge
     }
     Text(
-        text = buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(node), searchQuery, activeMatchIndex),
+        text = buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(node), searchQuery, activeMatchIndex, fontSetId),
         style = style,
         modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
     )
@@ -213,7 +228,7 @@ fun MarkdownParagraphTextBuffer(buffer: List<Node>, searchQuery: String, activeM
 }
 
 @Composable
-fun MarkdownParagraph(node: Paragraph, searchQuery: String = "", activeMatchIndex: Int = -1) {
+fun MarkdownParagraph(node: Paragraph, searchQuery: String = "", activeMatchIndex: Int = -1, fontSetId: String = "source") {
     Column(modifier = Modifier.fillMaxWidth()) {
         val children = getChildren(node)
         val textNodeBuffer = mutableListOf<Node>()
@@ -245,11 +260,34 @@ fun getChildren(node: Node): List<Node> {
     return list
 }
 @Composable
-fun MarkdownCodeBlock(node: FencedCodeBlock) {
+fun MarkdownCodeBlock(node: FencedCodeBlock, mermaidCloudEnabled: Boolean = false, fontSetId: String = "source") {
     val code = node.literal.trimEnd()
     val language = node.info ?: ""
     if (language.equals("math", ignoreCase = true) || language.equals("latex", ignoreCase = true)) {
         LatexBlock(content = code)
+        return
+    }
+    if (mermaidCloudEnabled && language.equals("mermaid", ignoreCase = true)) {
+        val bgColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant
+        val r = (bgColor.red * 255).toInt().toString(16).padStart(2, '0')
+        val g = (bgColor.green * 255).toInt().toString(16).padStart(2, '0')
+        val b = (bgColor.blue * 255).toInt().toString(16).padStart(2, '0')
+        val hexColor = "$r$g$b"
+        
+        val isDark = bgColor.red * 0.299f + bgColor.green * 0.587f + bgColor.blue * 0.114f < 0.5f
+        val themeStr = if (isDark) "dark" else "default"
+        val themeDirective = "%%{init: {'theme': '" + themeStr + "'}}%%\n"
+        
+        val finalCode = themeDirective + code
+        
+        // mermaid.ink actually expects standard base64 for its /img/ route sometimes, or base64url without padding.
+        // java.util.Base64.getUrlEncoder().encodeToString works well.
+        var encoded = java.util.Base64.getUrlEncoder().encodeToString(finalCode.toByteArray(Charsets.UTF_8))
+        // Remove padding if any
+        encoded = encoded.trimEnd('=')
+        
+        val url = "https://mermaid.ink/img/$encoded?bgColor=$hexColor"
+        AsyncMarkdownImage(url = url)
         return
     }
     val highlighted = SyntaxHighlighter.highlight(code, language)
@@ -262,9 +300,13 @@ fun MarkdownCodeBlock(node: FencedCodeBlock) {
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(16.dp)
     ) {
+        val monoFamily = when (fontSetId) {
+            "book" -> com.pilcrowmd.desktop.ui.theme.ibmPlexMonoFamily
+            else -> com.pilcrowmd.desktop.ui.theme.jetbrainsMonoFamily
+        }
         Text(
             text = highlighted,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = monoFamily,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(end = 40.dp)
@@ -287,7 +329,7 @@ fun MarkdownCodeBlock(node: FencedCodeBlock) {
 }
 
 @Composable
-fun MarkdownBlockQuote(node: BlockQuote, searchQuery: String = "", activeMatchIndex: Int = -1) {
+fun MarkdownBlockQuote(node: BlockQuote, searchQuery: String = "", activeMatchIndex: Int = -1, fontSetId: String = "source") {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -301,7 +343,7 @@ fun MarkdownBlockQuote(node: BlockQuote, searchQuery: String = "", activeMatchIn
         Column {
             var current = node.firstChild
             while (current != null) {
-                RenderBlock(current, searchQuery)
+                RenderBlock(current, searchQuery, -1, false, fontSetId)
                 current = current.next
             }
         }
@@ -309,7 +351,7 @@ fun MarkdownBlockQuote(node: BlockQuote, searchQuery: String = "", activeMatchIn
 }
 
 @Composable
-fun MarkdownList(node: ListBlock, searchQuery: String = "", activeMatchIndex: Int = -1) {
+fun MarkdownList(node: ListBlock, searchQuery: String = "", activeMatchIndex: Int = -1, fontSetId: String = "source") {
     val isOrdered = node is OrderedList
     var current = node.firstChild
     var index = 1
@@ -351,7 +393,7 @@ fun MarkdownList(node: ListBlock, searchQuery: String = "", activeMatchIndex: In
                 Column {
                     var child = current.firstChild
                     while (child != null) {
-                        RenderBlock(child, searchQuery)
+                        RenderBlock(child, searchQuery, -1, false, fontSetId)
                         child = child.next
                     }
                 }
@@ -363,7 +405,7 @@ fun MarkdownList(node: ListBlock, searchQuery: String = "", activeMatchIndex: In
 }
 
 @Composable
-fun MarkdownTable(node: TableBlock, searchQuery: String = "", activeMatchIndex: Int = -1) {
+fun MarkdownTable(node: TableBlock, searchQuery: String = "", activeMatchIndex: Int = -1, fontSetId: String = "source") {
     var columnCount = 0
     var headerRow = node.firstChild?.firstChild
     while (headerRow != null) {
@@ -432,34 +474,38 @@ fun MarkdownFrontMatter(node: YamlFrontMatterBlock) {
     }
 }
 
-fun buildInlineText(nodes: List<Node>, searchQuery: String = "", activeMatchIndex: Int = -1): androidx.compose.ui.text.AnnotatedString {
+fun buildInlineText(nodes: List<Node>, searchQuery: String = "", activeMatchIndex: Int = -1, fontSetId: String = "source"): androidx.compose.ui.text.AnnotatedString {
     val builder = androidx.compose.ui.text.AnnotatedString.Builder()
     for (current in nodes) {
         when (current) {
             is Text -> builder.append(current.literal)
             is Emphasis -> {
                 builder.pushStyle(SpanStyle(fontStyle = FontStyle.Italic))
-                builder.append(buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(current), searchQuery, activeMatchIndex))
+                builder.append(buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(current), searchQuery, activeMatchIndex, fontSetId))
                 builder.pop()
             }
             is StrongEmphasis -> {
                 builder.pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
-                builder.append(buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(current), searchQuery, activeMatchIndex))
+                builder.append(buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(current), searchQuery, activeMatchIndex, fontSetId))
                 builder.pop()
             }
             is Strikethrough -> {
                 builder.pushStyle(SpanStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough))
-                builder.append(buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(current), searchQuery, activeMatchIndex))
+                builder.append(buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(current), searchQuery, activeMatchIndex, fontSetId))
                 builder.pop()
             }
             is Code -> {
-                builder.pushStyle(SpanStyle(fontFamily = FontFamily.Monospace, background = Color(0x22888888)))
+                val monoFamily = when(fontSetId) {
+                    "book" -> com.pilcrowmd.desktop.ui.theme.ibmPlexMonoFamily
+                    else -> com.pilcrowmd.desktop.ui.theme.jetbrainsMonoFamily
+                }
+                builder.pushStyle(SpanStyle(fontFamily = monoFamily, background = Color(0x22888888)))
                 builder.append(current.literal)
                 builder.pop()
             }
             is Link -> {
                 builder.pushStyle(SpanStyle(color = Color(0xFF1976D2), textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline))
-                builder.append(buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(current), searchQuery, activeMatchIndex))
+                builder.append(buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(current), searchQuery, activeMatchIndex, fontSetId))
                 builder.pop()
             }
             is Image -> {
@@ -467,7 +513,7 @@ fun buildInlineText(nodes: List<Node>, searchQuery: String = "", activeMatchInde
             }
             else -> {
                 if (current.firstChild != null) {
-                    builder.append(buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(current), searchQuery, activeMatchIndex))
+                    builder.append(buildInlineText(com.pilcrowmd.desktop.rendering.getChildren(current), searchQuery, activeMatchIndex, fontSetId))
                 }
             }
         }

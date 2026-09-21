@@ -54,6 +54,9 @@ class DesktopStorageManager : StorageManager {
     private val _mermaidCloudEnabled = MutableStateFlow(false)
     override val mermaidCloudEnabled: StateFlow<Boolean> = _mermaidCloudEnabled.asStateFlow()
 
+    private val _restoreTabsOnStartup = MutableStateFlow(true)
+    override val restoreTabsOnStartup: StateFlow<Boolean> = _restoreTabsOnStartup.asStateFlow()
+
     private val _recentFiles = MutableStateFlow<List<RecentFile>>(emptyList())
     override val recentFiles: StateFlow<List<RecentFile>> = _recentFiles.asStateFlow()
 
@@ -84,6 +87,7 @@ class DesktopStorageManager : StorageManager {
         val lineNumbersEnabled: Boolean = true,
         val fontSetId: String = "source",
         val mermaidCloudEnabled: Boolean = false,
+        val restoreTabsOnStartup: Boolean = true,
         val lastFilePathStr: String? = null,
         val openFilePaths: List<String> = emptyList(),
         val activeTabIndex: Int = 0
@@ -107,6 +111,7 @@ class DesktopStorageManager : StorageManager {
                 _lineNumbersEnabled.value = settings.lineNumbersEnabled
                 _fontSetId.value = settings.fontSetId
                 _mermaidCloudEnabled.value = settings.mermaidCloudEnabled
+                _restoreTabsOnStartup.value = settings.restoreTabsOnStartup
                 _lastFilePath.value = settings.lastFilePathStr?.let { Path.of(it) }
                 _openFilePaths.value = settings.openFilePaths
                 _activeTabIndex.value = settings.activeTabIndex
@@ -126,6 +131,7 @@ class DesktopStorageManager : StorageManager {
                 lineNumbersEnabled = _lineNumbersEnabled.value,
                 fontSetId = _fontSetId.value,
                 mermaidCloudEnabled = _mermaidCloudEnabled.value,
+                restoreTabsOnStartup = _restoreTabsOnStartup.value,
                 lastFilePathStr = _lastFilePath.value?.toAbsolutePath()?.toString(),
                 openFilePaths = _openFilePaths.value,
                 activeTabIndex = _activeTabIndex.value
@@ -229,6 +235,11 @@ class DesktopStorageManager : StorageManager {
 
     override suspend fun setMermaidCloudEnabled(enabled: Boolean) {
         _mermaidCloudEnabled.value = enabled
+        saveSettings()
+    }
+
+    override suspend fun setRestoreTabsOnStartup(enabled: Boolean) {
+        _restoreTabsOnStartup.value = enabled
         saveSettings()
     }
 

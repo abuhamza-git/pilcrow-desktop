@@ -28,135 +28,122 @@ import kotlin.math.roundToInt
 
 @Composable
 fun SettingsScreen(storageManager: StorageManager, onClose: () -> Unit) {
-    val coroutineScope = rememberCoroutineScope()
-    var selectedTab by remember { mutableStateOf("Appearance") }
-    
-    val surfaceColor = MaterialTheme.colorScheme.surface
     val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
     val onSurface = MaterialTheme.colorScheme.onSurface
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     val primary = MaterialTheme.colorScheme.primary
     val outline = MaterialTheme.colorScheme.outline
+    val background = MaterialTheme.colorScheme.background
 
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(background)
     ) {
-        // Sidebar
-        Column(
+        // Top Header
+        Row(
             modifier = Modifier
-                .width(240.dp)
-                .fillMaxHeight()
-                .background(surfaceVariant.copy(alpha = 0.5f))
+                .fillMaxWidth()
+                .background(surfaceVariant.copy(alpha = 0.3f))
                 .border(1.dp, outline.copy(alpha = 0.2f))
-                .padding(16.dp)
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 24.dp)) {
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = onSurface)
-                }
-                Spacer(Modifier.width(8.dp))
-                Text("Settings", style = MaterialTheme.typography.headlineMedium, color = onSurface)
+            IconButton(onClick = onClose) {
+                Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = onSurface)
             }
-            
-            val tabs = listOf(
-                "Appearance" to Icons.Outlined.Palette,
-                "Editor" to Icons.Outlined.Edit,
-                "About" to Icons.Outlined.Info
-            )
-            
-            tabs.forEach { (title, icon) ->
-                val isSelected = selectedTab == title
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isSelected) primary.copy(alpha = 0.15f) else androidx.compose.ui.graphics.Color.Transparent)
-                        .clickable { selectedTab = title }
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(icon, contentDescription = null, tint = if (isSelected) primary else onSurfaceVariant, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Text(title, color = if (isSelected) primary else onSurface, fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal)
-                }
-                Spacer(Modifier.height(4.dp))
-            }
-            
-
+            Spacer(Modifier.width(16.dp))
+            Text("Settings", style = MaterialTheme.typography.headlineMedium, color = onSurface)
         }
-
+        
         // Main Content Area
-        Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.TopCenter) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(
                 modifier = Modifier
-                    .widthIn(max = 600.dp)
+                    .widthIn(max = 680.dp)
                     .fillMaxHeight()
                     .verticalScroll(rememberScrollState())
                     .padding(32.dp)
             ) {
-                Text(selectedTab, style = MaterialTheme.typography.headlineSmall, color = onSurface, modifier = Modifier.padding(bottom = 24.dp))
+                SectionTitle("Appearance", onSurface)
+                AppearanceSettings(storageManager, primary, onSurface, onSurfaceVariant, outline, surfaceVariant, background)
                 
-                when (selectedTab) {
-                    "Appearance" -> AppearanceSettings(storageManager, coroutineScope, primary, onSurface, onSurfaceVariant, outline, surfaceVariant)
-                    "Editor" -> EditorSettings(storageManager, coroutineScope, primary, onSurface, onSurfaceVariant, outline, surfaceVariant)
-                    "About" -> AboutSettings(primary, onSurface, onSurfaceVariant, outline, surfaceVariant)
-                }
+                Spacer(Modifier.height(48.dp))
+                
+                SectionTitle("Editor & Behavior", onSurface)
+                EditorSettings(storageManager, primary, onSurface, onSurfaceVariant, outline, surfaceVariant)
+                
+                Spacer(Modifier.height(48.dp))
+                
+                SectionTitle("About", onSurface)
+                AboutSettings(primary, onSurface, onSurfaceVariant, outline, surfaceVariant)
+                
+                Spacer(Modifier.height(32.dp))
             }
         }
     }
 }
 
 @Composable
-fun AppearanceSettings(storageManager: StorageManager, coroutineScope: kotlinx.coroutines.CoroutineScope, primary: androidx.compose.ui.graphics.Color, onSurface: androidx.compose.ui.graphics.Color, onSurfaceVariant: androidx.compose.ui.graphics.Color, outline: androidx.compose.ui.graphics.Color, surfaceVariant: androidx.compose.ui.graphics.Color) {
+private fun SectionTitle(text: String, onSurface: androidx.compose.ui.graphics.Color) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+        color = onSurface,
+        modifier = Modifier.padding(bottom = 16.dp, start = 4.dp)
+    )
+}
+
+@Composable
+fun AppearanceSettings(storageManager: StorageManager, primary: androidx.compose.ui.graphics.Color, onSurface: androidx.compose.ui.graphics.Color, onSurfaceVariant: androidx.compose.ui.graphics.Color, outline: androidx.compose.ui.graphics.Color, surfaceVariant: androidx.compose.ui.graphics.Color, background: androidx.compose.ui.graphics.Color) {
+    val coroutineScope = rememberCoroutineScope()
     val themeMode by storageManager.themeMode.collectAsState(initial = ThemeMode.DARK)
     val fontSetId by storageManager.fontSetId.collectAsState(initial = "source")
+    val fontScale by storageManager.fontScale.collectAsState(initial = 1.0f)
     
     SettingsCard(surfaceVariant, outline) {
         CardTitle("Theme", onSurface)
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ThemeOption(
-                icon = Icons.Outlined.DarkMode, label = "Dark Mode",
-                selected = themeMode == ThemeMode.DARK,
-                onClick = { coroutineScope.launch { storageManager.setThemeMode(ThemeMode.DARK) } },
-                primary = primary, onSurface = onSurface, outline = outline,
-                background = MaterialTheme.colorScheme.background, modifier = Modifier.weight(1f)
-            )
-            ThemeOption(
-                icon = Icons.Outlined.LightMode, label = "Light Mode",
-                selected = themeMode == ThemeMode.LIGHT,
-                onClick = { coroutineScope.launch { storageManager.setThemeMode(ThemeMode.LIGHT) } },
-                primary = primary, onSurface = onSurface, outline = outline,
-                background = MaterialTheme.colorScheme.background, modifier = Modifier.weight(1f)
-            )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ThemeOption(Icons.Outlined.DarkMode, "Dark", themeMode == ThemeMode.DARK, { coroutineScope.launch { storageManager.setThemeMode(ThemeMode.DARK) } }, primary, onSurface, outline, background, Modifier.weight(1f))
+            ThemeOption(Icons.Outlined.LightMode, "Light", themeMode == ThemeMode.LIGHT, { coroutineScope.launch { storageManager.setThemeMode(ThemeMode.LIGHT) } }, primary, onSurface, outline, background, Modifier.weight(1f))
         }
     }
     CardGap()
     SettingsCard(surfaceVariant, outline) {
-        CardTitle("Typography Family", onSurface)
+        CardTitle("UI Font", onSurface)
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("source" to "Source Serif", "atkinson" to "Atkinson", "merriweather" to "Merriweather").forEach { (id, name) ->
-                FontPill(
-                    label = name, selected = fontSetId == id,
-                    onClick = { coroutineScope.launch { storageManager.saveFontSetId(id) } },
-                    primary = primary, onSurface = onSurface, outline = outline,
-                    background = MaterialTheme.colorScheme.background, modifier = Modifier.weight(1f)
-                )
-            }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            FontPill("Classic", fontSetId == "source", { coroutineScope.launch { storageManager.saveFontSetId("source") } }, primary, onSurface, outline, background, Modifier.weight(1f))
+            FontPill("Book", fontSetId == "book", { coroutineScope.launch { storageManager.saveFontSetId("book") } }, primary, onSurface, outline, background, Modifier.weight(1f))
+            FontPill("Modern", fontSetId == "modern", { coroutineScope.launch { storageManager.saveFontSetId("modern") } }, primary, onSurface, outline, background, Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-fun EditorSettings(storageManager: StorageManager, coroutineScope: kotlinx.coroutines.CoroutineScope, primary: androidx.compose.ui.graphics.Color, onSurface: androidx.compose.ui.graphics.Color, onSurfaceVariant: androidx.compose.ui.graphics.Color, outline: androidx.compose.ui.graphics.Color, surfaceVariant: androidx.compose.ui.graphics.Color) {
+fun EditorSettings(storageManager: StorageManager, primary: androidx.compose.ui.graphics.Color, onSurface: androidx.compose.ui.graphics.Color, onSurfaceVariant: androidx.compose.ui.graphics.Color, outline: androidx.compose.ui.graphics.Color, surfaceVariant: androidx.compose.ui.graphics.Color) {
+    val coroutineScope = rememberCoroutineScope()
     val lineNumbers by storageManager.lineNumbersEnabled.collectAsState(initial = false)
     val editorFontScale by storageManager.editorFontScale.collectAsState(initial = 1.0f)
     val previewFontScale by storageManager.previewFontScale.collectAsState(initial = 1.0f)
     val mermaidEnabled by storageManager.mermaidCloudEnabled.collectAsState(initial = false)
+    val restoreTabs by storageManager.restoreTabsOnStartup.collectAsState(initial = true)
     
+    SettingsCard(surfaceVariant, outline) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                CardTitle("Restore open tabs on startup", onSurface)
+                Text("Remember which files were open when you last closed the app", color = onSurfaceVariant, fontSize = 12.sp)
+            }
+            Switch(
+                checked = restoreTabs,
+                onCheckedChange = { coroutineScope.launch { storageManager.setRestoreTabsOnStartup(it) } },
+                modifier = Modifier.scale(0.8f)
+            )
+        }
+    }
+    CardGap()
     SettingsCard(surfaceVariant, outline) {
         CardTitle("Editor Text Size", onSurface)
         Spacer(Modifier.height(12.dp))
@@ -212,8 +199,8 @@ fun AboutSettings(primary: androidx.compose.ui.graphics.Color, onSurface: androi
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Icon(Icons.Outlined.Info, contentDescription = null, tint = primary, modifier = Modifier.size(24.dp))
             Column {
-                CardTitle("PilcrowMD Desktop", onSurface)
-                Text("Version 1.0.5", color = onSurfaceVariant, fontSize = 12.sp)
+                CardTitle("PilcrowMD Desktop Community Edition", onSurface)
+                Text("Version 1.0.8", color = onSurfaceVariant, fontSize = 12.sp)
             }
         }
         Spacer(Modifier.height(16.dp))

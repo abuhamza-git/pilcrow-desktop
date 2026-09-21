@@ -46,7 +46,7 @@ compose.desktop {
         mainClass = "com.pilcrowmd.desktop.MainKt"
         nativeDistributions {
             packageName = "PilcrowMD"
-            packageVersion = "1.0.7"
+            packageVersion = "1.0.8"
             description = "A beautiful Markdown reader & editor"
             modules("java.instrument", "jdk.unsupported")
 

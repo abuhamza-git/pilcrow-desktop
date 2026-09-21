@@ -52,16 +52,24 @@ import kotlinx.coroutines.withContext
 import java.nio.file.Files
 import java.util.Base64
 import kotlin.io.path.name
-fun main(args: Array<String>) = application {
+fun main(args: Array<String>) {
+    val configDir = java.io.File(System.getProperty("user.home"), ".config/pilcrow")
+    configDir.mkdirs()
+    com.pilcrowmd.desktop.SingleInstance.checkAndStart(args, configDir)
+    
+    application {
     val storageManager: StorageManager = remember { DesktopStorageManager() }
     val fileRepository: FileRepository = remember { DesktopFileRepository() }
     val coroutineScope = rememberCoroutineScope()
     
     val themeMode by storageManager.themeMode.collectAsState(initial = com.pilcrowmd.core.domain.model.ThemeMode.DARK)
+    val fontSetId by storageManager.fontSetId.collectAsState(initial = "source")
     val isDarkTheme = themeMode == com.pilcrowmd.core.domain.model.ThemeMode.DARK
     val lineNumbersEnabled by storageManager.lineNumbersEnabled.collectAsState(initial = false)
     val editorFontScale by storageManager.editorFontScale.collectAsState(initial = 1.0f)
     val previewFontScale by storageManager.previewFontScale.collectAsState(initial = 1.0f)
+    val mermaidEnabled by storageManager.mermaidCloudEnabled.collectAsState(initial = false)
+    val restoreTabs by storageManager.restoreTabsOnStartup.collectAsState(initial = true)
     val recentFiles by storageManager.recentFiles.collectAsState(initial = emptyList())
     
     val openFilePaths by storageManager.openFilePaths.collectAsState(initial = emptyList())
@@ -100,13 +108,19 @@ fun main(args: Array<String>) = application {
             if (loadedTabs.isNotEmpty()) {
                 tabs.addAll(loadedTabs)
                 activeTabIndex = activeTabIndexFlow.coerceIn(0, tabs.size - 1)
-            } else if (args.isNotEmpty()) {
+            }
+            if (args.isNotEmpty()) {
                 val p = Path.of(args[0])
                 if (p.exists()) {
-                    val result = fileRepository.readFile(p)
-                    if (result.isSuccess) {
-                        tabs.add(com.pilcrowmd.desktop.state.TabState(initialFile = p, initialContent = result.getOrNull() ?: ""))
-                        activeTabIndex = 0
+                    val existingIndex = tabs.indexOfFirst { it.file == p }
+                    if (existingIndex >= 0) {
+                        activeTabIndex = existingIndex
+                    } else {
+                        val result = fileRepository.readFile(p)
+                        if (result.isSuccess) {
+                            tabs.add(com.pilcrowmd.desktop.state.TabState(initialFile = p, initialContent = result.getOrNull() ?: ""))
+                            activeTabIndex = tabs.lastIndex
+                        }
                     }
                 }
             }
@@ -233,6 +247,8 @@ fun main(args: Array<String>) = application {
         }
     }
 
+    val windowState = rememberWindowState(size = DpSize(1200.dp, 800.dp))
+    
     Window(
         onCloseRequest = {
             if (tabs.any { it.isDirty }) {
@@ -243,9 +259,31 @@ fun main(args: Array<String>) = application {
             }
         },
         title = windowTitle,
-        state = rememberWindowState(size = DpSize(1200.dp, 800.dp))
+        state = windowState
     ) {
+        LaunchedEffect(Unit) {
+            com.pilcrowmd.desktop.SingleInstance.openFileRequests.collect { msg ->
+                if (windowState.isMinimized) {
+                    windowState.isMinimized = false
+                }
+                
+                // Bring to front and request focus
+                window.isAlwaysOnTop = true
+                window.isAlwaysOnTop = false
+                window.toFront()
+                window.requestFocus()
+
+                if (msg != "FOCUS") {
+                    val p = Path.of(msg)
+                    if (p.exists()) {
+                        openFileIntoTab(p)
+                    }
+                }
+            }
+        }
+
         PilcrowDesktopTheme(darkTheme = isDarkTheme) {
+            if (!hasLoadedTabs) return@PilcrowDesktopTheme
             Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background, contentColor = MaterialTheme.colorScheme.onBackground) {
                 if (showSettings) {
                     com.pilcrowmd.desktop.SettingsScreen(
@@ -519,7 +557,9 @@ fun main(args: Array<String>) = application {
                                             showLineNumbers = lineNumbersEnabled,
                                             scrollState = activeTab.editorScrollState,
                                             searchQuery = activeTab.searchQuery,
-                                            searchCurrentIndex = activeTab.searchCurrentIndex
+                                            searchCurrentIndex = activeTab.searchCurrentIndex,
+                                            editorFontScale = editorFontScale,
+                                            fontSetId = fontSetId
                                         )
                                         androidx.compose.foundation.VerticalScrollbar(
                                             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
@@ -542,6 +582,8 @@ fun main(args: Array<String>) = application {
                                                 searchQuery = activeTab.searchQuery,
                                                 searchCurrentIndex = activeTab.searchCurrentIndex,
                                                 previewFontScale = previewFontScale,
+                                                fontSetId = fontSetId,
+                                                mermaidCloudEnabled = mermaidEnabled,
                                                 onHeadingPositioned = { idx, y -> activeTab.headingPositions[idx] = y }
                                             )
                                         }
@@ -664,6 +706,7 @@ fun main(args: Array<String>) = application {
 }
 
 
+}
 @Composable
 fun WelcomeScreen(
     onOpenFile: () -> Unit,
@@ -690,19 +733,6 @@ fun WelcomeScreen(
             ) {
                 // Logo/Title area
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Surface(
-                        shape = androidx.compose.foundation.shape.CircleShape,
-                        color = androidx.compose.ui.graphics.Color.Transparent,
-                        modifier = Modifier.size(80.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            androidx.compose.foundation.Image(
-                                painter = androidx.compose.ui.res.painterResource("icon.png"),
-                                contentDescription = "PilcrowMD Logo",
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                    }
                     Text(
                         text = "PilcrowMD Desktop\nCommunity Edition",
                         style = MaterialTheme.typography.headlineLarge,
@@ -820,7 +850,8 @@ fun EditorScreen(
     searchQuery: String = "",
     searchCurrentIndex: Int = 0,
     scrollState: androidx.compose.foundation.ScrollState = androidx.compose.foundation.rememberScrollState(),
-    editorFontScale: Float = 1.0f
+    editorFontScale: Float = 1.0f,
+    fontSetId: String = "source"
 ) {
     var textState by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(content)) }
 
@@ -901,9 +932,13 @@ fun EditorScreen(
                     text = lineNumbersText,
                     style = MaterialTheme.typography.bodyMedium.copy(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        fontFamily = when(fontSetId) {
+                            "book" -> com.pilcrowmd.desktop.ui.theme.ibmPlexMonoFamily
+                            else -> com.pilcrowmd.desktop.ui.theme.jetbrainsMonoFamily
+                        },
                         textAlign = androidx.compose.ui.text.style.TextAlign.End,
-                        fontSize = MaterialTheme.typography.bodyMedium.fontSize * editorFontScale
+                        fontSize = MaterialTheme.typography.bodyMedium.fontSize * editorFontScale,
+                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * editorFontScale
                     ),
                     modifier = Modifier.padding(end = 16.dp).widthIn(min = 24.dp)
                 )
@@ -920,8 +955,12 @@ fun EditorScreen(
                 modifier = Modifier.weight(1f).bringIntoViewRequester(bringIntoViewRequester),
                 textStyle = MaterialTheme.typography.bodyMedium.copy(
                     color = MaterialTheme.colorScheme.onBackground,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    fontSize = MaterialTheme.typography.bodyMedium.fontSize * editorFontScale
+                    fontFamily = when(fontSetId) {
+                            "book" -> com.pilcrowmd.desktop.ui.theme.ibmPlexMonoFamily
+                            else -> com.pilcrowmd.desktop.ui.theme.jetbrainsMonoFamily
+                        },
+                    fontSize = MaterialTheme.typography.bodyMedium.fontSize * editorFontScale,
+                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * editorFontScale
                 )
             )
         }

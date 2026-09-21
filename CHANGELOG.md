@@ -7,6 +7,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.8] - 2026-09-21
+### Fixed
+- Restored original mobile typography sets (Classic, Book, Modern).
+- Fixed font size scaling in Editor and Reader causing overlapping text (properly scaling line-height).
+- Removed accidental app logo from the Welcome Screen.
+- Fixed Mermaid diagrams to perfectly integrate with PilcrowMD's dark and light backgrounds.
+
 ## [1.0.7] - 2026-09-08
 
 ### Fixed

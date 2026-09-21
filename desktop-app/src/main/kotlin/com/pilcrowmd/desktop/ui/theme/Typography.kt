@@ -74,3 +74,18 @@ object PilcrowTypography {
     const val FOOTNOTE_FONT_SIZE_SP: Float = 15f
     const val TABLE_FONT_SIZE_SP: Float = 15f
 }
+
+val merriweatherFamily = FontFamily(
+    Font("fonts/merriweather_regular.ttf", FontWeight.Normal),
+    Font("fonts/merriweather_bold.ttf", FontWeight.Bold),
+)
+
+val atkinsonFamily = FontFamily(
+    Font("fonts/atkinson_hyperlegible_regular.ttf", FontWeight.Normal),
+    Font("fonts/atkinson_hyperlegible_bold.ttf", FontWeight.Bold),
+)
+
+val ibmPlexMonoFamily = FontFamily(
+    Font("fonts/ibm_plex_mono_regular.ttf", FontWeight.Normal),
+    Font("fonts/ibm_plex_mono_bold.ttf", FontWeight.Bold),
+)

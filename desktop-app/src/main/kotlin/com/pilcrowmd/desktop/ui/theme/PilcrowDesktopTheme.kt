@@ -38,11 +38,13 @@ fun PilcrowDesktopTheme(
         )
     }
 
+
     CompositionLocalProvider(
         LocalMDColors provides mdColorScheme
     ) {
         MaterialTheme(
             colorScheme = materialColorScheme,
+            
             content = content
         )
     }

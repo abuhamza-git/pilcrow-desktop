@@ -56,7 +56,9 @@ interface StorageManager {
     suspend fun saveFontSetId(id: String)
 
     val mermaidCloudEnabled: Flow<Boolean>
+    val restoreTabsOnStartup: Flow<Boolean>
     suspend fun setMermaidCloudEnabled(enabled: Boolean)
+    suspend fun setRestoreTabsOnStartup(enabled: Boolean)
 
     val themeMode: Flow<ThemeMode>
     suspend fun setThemeMode(mode: ThemeMode)
