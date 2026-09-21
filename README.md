@@ -31,7 +31,7 @@ Download the latest Community Edition release from the [Releases](https://github
 
 ### Windows
 
-Download the `.msi` installer from the latest release.
+Download the `.msi` / `.exe` installers from the latest release.
 
 ### Linux
 
@@ -39,7 +39,6 @@ Packages are available in formats including:
 
 - `.deb` — Debian / Ubuntu
 - `.rpm` — Fedora / Red Hat
-- `.AppImage` — Portable Linux package
 
 ## 🛠️ Tech Stack & Architecture
 
