@@ -62,9 +62,12 @@ object SingleInstance {
                         if (magic == MAGIC) {
                             val msg = reader.readLine()
                             if (msg != null) {
-                                @OptIn(DelicateCoroutinesApi::class)
-                                GlobalScope.launch(Dispatchers.Main) {
-                                    ipcFlow.emit(msg)
+                                // Basic validation: Ensure it's FOCUS or a valid file path that isn't excessively long
+                                if (msg == "FOCUS" || (msg.length < 4096 && !msg.contains('\u0000'))) {
+                                    @OptIn(DelicateCoroutinesApi::class)
+                                    GlobalScope.launch(Dispatchers.Main) {
+                                        ipcFlow.emit(msg)
+                                    }
                                 }
                             }
                         }

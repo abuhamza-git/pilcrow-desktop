@@ -15,6 +15,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.net.URL
 import javax.imageio.ImageIO
 import java.io.File
@@ -28,17 +29,22 @@ fun AsyncMarkdownImage(url: String, modifier: Modifier = Modifier, basePath: Pat
     LaunchedEffect(url) {
         withContext(Dispatchers.IO) {
             try {
-                val image = if (url.startsWith("http://") || url.startsWith("https://")) {
-                    ImageIO.read(URL(url))
-                } else if (url.startsWith("file://")) {
-                    ImageIO.read(File(java.net.URI(url)))
-                } else {
-                    val file = if (basePath != null && !File(url).isAbsolute) {
-                        basePath.resolve(url).normalize().toFile()
+                val image = withTimeout(10_000L) {
+                    if (url.startsWith("http://") || url.startsWith("https://")) {
+                        val connection = URL(url).openConnection()
+                        connection.connectTimeout = 5000
+                        connection.readTimeout = 5000
+                        ImageIO.read(connection.getInputStream())
+                    } else if (url.startsWith("file://")) {
+                        ImageIO.read(File(java.net.URI(url)))
                     } else {
-                        File(url)
+                        val file = if (basePath != null && !File(url).isAbsolute) {
+                            basePath.resolve(url).normalize().toFile()
+                        } else {
+                            File(url)
+                        }
+                        ImageIO.read(file)
                     }
-                    ImageIO.read(file)
                 }
                 
                 if (image != null) {
@@ -47,6 +53,7 @@ fun AsyncMarkdownImage(url: String, modifier: Modifier = Modifier, basePath: Pat
                     error = true
                 }
             } catch (e: Exception) {
+                e.printStackTrace()
                 error = true
             }
         }

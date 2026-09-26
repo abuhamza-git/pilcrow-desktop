@@ -11,6 +11,15 @@ All notable changes to Pilcrow are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.11] - 2026-09-27
+### Fixed
+- Fixed table rendering where columns were arbitrarily squashed on wrap by implementing an HTML-style table bounds layout algorithm.
+- Hardened app security by sandboxing Image fetches (preventing DoS) and sanitizing single-instance IPC paths.
+### Removed
+- Entirely dropped the dead Android legacy code, reducing codebase bloat and eliminating duplicate domain logic.
+### Changed
+- Bumped openhtmltopdf PDF renderer to version 1.0.10.
+
 ## [Unreleased]
 
 

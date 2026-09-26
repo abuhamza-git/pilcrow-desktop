@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // PilcrowMD Desktop — Linux port
 
+
 @file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 package com.pilcrowmd.desktop
+import com.pilcrowmd.desktop.ui.screen.WelcomeScreen
+import com.pilcrowmd.desktop.ui.screen.EditorScreen
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -274,9 +277,13 @@ fun main(args: Array<String>) {
                 window.requestFocus()
 
                 if (msg != "FOCUS") {
-                    val p = Path.of(msg)
-                    if (p.exists()) {
-                        openFileIntoTab(p)
+                    try {
+                        val p = Path.of(msg)
+                        if (p.toFile().isFile) {
+                            openFileIntoTab(p)
+                        }
+                    } catch (e: Exception) {
+                        // Invalid path
                     }
                 }
             }
@@ -706,267 +713,6 @@ fun main(args: Array<String>) {
 }
 
 
-}
-@Composable
-fun WelcomeScreen(
-    onOpenFile: () -> Unit,
-    onNewFile: () -> Unit,
-    onSettings: () -> Unit,
-    recentFiles: List<com.pilcrowmd.core.storage.RecentFile>,
-    onOpenRecent: (Path) -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        contentAlignment = Alignment.Center
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(64.dp),
-            horizontalArrangement = if (recentFiles.isNotEmpty()) Arrangement.SpaceEvenly else Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Left Column: Hero & Actions
-            Column(
-                modifier = Modifier.width(360.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                // Logo/Title area
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text(
-                        text = "PilcrowMD Desktop\nCommunity Edition",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = "A private, distraction-free Markdown reader & editor.\n(Unofficial Community Port)",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Actions
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // Open + New side by side
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(
-                            onClick = onOpenFile,
-                            modifier = Modifier.weight(1f).height(48.dp),
-                            shape = MaterialTheme.shapes.medium
-                        ) {
-                            Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Open File", style = MaterialTheme.typography.labelLarge)
-                        }
-                        OutlinedButton(
-                            onClick = onNewFile,
-                            modifier = Modifier.weight(1f).height(48.dp),
-                            shape = MaterialTheme.shapes.medium
-                        ) {
-                            Icon(Icons.Default.NoteAdd, contentDescription = null, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("New File", style = MaterialTheme.typography.labelLarge)
-                        }
-                    }
-                    
-                    OutlinedButton(
-                        onClick = onSettings,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = MaterialTheme.shapes.medium
-                    ) {
-                        Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Settings", style = MaterialTheme.typography.labelLarge)
-                    }
-                }
-            }
-
-            // Right Column: Recent Files (Only if they exist)
-            if (recentFiles.isNotEmpty()) {
-                Column(
-                    modifier = Modifier.width(420.dp).heightIn(max = 600.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Text(
-                        text = "Recent Files",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-
-                    Surface(
-                        shape = MaterialTheme.shapes.large,
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                        modifier = Modifier.fillMaxWidth().weight(1f, fill = false)
-                    ) {
-                        LazyColumn(
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            itemsIndexed(recentFiles) { index, file ->
-                                Surface(
-                                    onClick = { onOpenRecent(file.path) },
-                                    color = androidx.compose.ui.graphics.Color.Transparent,
-                                    shape = MaterialTheme.shapes.medium,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
-                                        Text(
-                                            text = file.displayName, 
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            text = file.path.toString(),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                                if (index < recentFiles.lastIndex) {
-                                    androidx.compose.material3.HorizontalDivider(
-                                        modifier = Modifier.padding(horizontal = 12.dp),
-                                        color = MaterialTheme.colorScheme.outlineVariant
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun EditorScreen(
-    content: String,
-    onContentChange: (String) -> Unit,
-    showLineNumbers: Boolean,
-    searchQuery: String = "",
-    searchCurrentIndex: Int = 0,
-    scrollState: androidx.compose.foundation.ScrollState = androidx.compose.foundation.rememberScrollState(),
-    editorFontScale: Float = 1.0f,
-    fontSetId: String = "source"
-) {
-    var textState by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(content)) }
-
-    var lastExternalContent by remember { mutableStateOf(content) }
-    if (content != lastExternalContent && content != textState.text) {
-        textState = androidx.compose.ui.text.input.TextFieldValue(content)
-        lastExternalContent = content
-    } else if (content != lastExternalContent) {
-        lastExternalContent = content
-    }
-
-    val annotatedString = remember(textState.text, searchQuery, searchCurrentIndex) {
-        androidx.compose.ui.text.buildAnnotatedString {
-            append(textState.text)
-            if (searchQuery.isNotEmpty()) {
-                var index = textState.text.indexOf(searchQuery, ignoreCase = true)
-                var matchIndex = 0
-                while (index >= 0) {
-                    val isActive = matchIndex == searchCurrentIndex
-                    addStyle(
-                        style = androidx.compose.ui.text.SpanStyle(
-                            background = if (isActive) androidx.compose.ui.graphics.Color(0xFFFFA500) else androidx.compose.ui.graphics.Color(0x88E2B93B),
-                            color = androidx.compose.ui.graphics.Color.Black
-                        ),
-                        start = index,
-                        end = index + searchQuery.length
-                    )
-                    index = textState.text.indexOf(searchQuery, startIndex = index + searchQuery.length, ignoreCase = true)
-                    matchIndex++
-                }
-            }
-        }
-    }
-    
-    val textFieldValue = androidx.compose.ui.text.input.TextFieldValue(
-        annotatedString = annotatedString,
-        selection = textState.selection,
-        composition = textState.composition
-    )
-
-    val bringIntoViewRequester = remember { BringIntoViewRequester() }
-    class TextLayoutHolder(var result: androidx.compose.ui.text.TextLayoutResult? = null)
-    val layoutHolder = remember { TextLayoutHolder() }
-    
-    LaunchedEffect(searchCurrentIndex, searchQuery) {
-        if (searchQuery.isNotEmpty()) {
-            var layout = layoutHolder.result
-            while (layout == null) {
-                kotlinx.coroutines.delay(16)
-                layout = layoutHolder.result
-            }
-            var index = textState.text.indexOf(searchQuery, ignoreCase = true)
-            var matchIndex = 0
-            while (index >= 0) {
-                if (matchIndex == searchCurrentIndex) {
-                    val boundingBox = layout.getBoundingBox(index)
-                    bringIntoViewRequester.bringIntoView(boundingBox)
-                    break
-                }
-                index = textState.text.indexOf(searchQuery, startIndex = index + searchQuery.length, ignoreCase = true)
-                matchIndex++
-            }
-        }
-    }
-
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        Row(
-            modifier = Modifier
-                .fillMaxHeight()
-                .widthIn(max = 1000.dp)
-                .padding(horizontal = 32.dp, vertical = 16.dp)
-                .verticalScroll(scrollState)
-        ) {
-            if (showLineNumbers) {
-                val lineCount = textState.text.count { it == '\n' } + 1
-                val lineNumbersText = (1..lineCount).joinToString("\n")
-                Text(
-                    text = lineNumbersText,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        fontFamily = when(fontSetId) {
-                            "book" -> com.pilcrowmd.desktop.ui.theme.ibmPlexMonoFamily
-                            else -> com.pilcrowmd.desktop.ui.theme.jetbrainsMonoFamily
-                        },
-                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
-                        fontSize = MaterialTheme.typography.bodyMedium.fontSize * editorFontScale,
-                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * editorFontScale,
-                        textDirection = androidx.compose.ui.text.style.TextDirection.Content
-                    ),
-                    modifier = Modifier.padding(end = 16.dp).widthIn(min = 24.dp)
-                )
-            }
-            androidx.compose.foundation.text.BasicTextField(
-                value = textFieldValue,
-                onValueChange = { newValue ->
-                    textState = newValue.copy(annotatedString = AnnotatedString(newValue.text))
-                    onContentChange(newValue.text)
-                },
-                onTextLayout = { result ->
-                    layoutHolder.result = result
-                },
-                modifier = Modifier.weight(1f).bringIntoViewRequester(bringIntoViewRequester),
-                textStyle = MaterialTheme.typography.bodyMedium.copy(
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontFamily = when(fontSetId) {
-                            "book" -> com.pilcrowmd.desktop.ui.theme.ibmPlexMonoFamily
-                            else -> com.pilcrowmd.desktop.ui.theme.jetbrainsMonoFamily
-                        },
-                    fontSize = MaterialTheme.typography.bodyMedium.fontSize * editorFontScale,
-                        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * editorFontScale,
-                        textDirection = androidx.compose.ui.text.style.TextDirection.Content
-                )
-            )
-        }
-    }
 }
 
 fun String.isRtl(): Boolean {

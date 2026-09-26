@@ -22,28 +22,45 @@ fun SimpleTableLayout(
         val columnWidths = IntArray(columnCount) { 0 }
         val rowHeights = IntArray(rowCount) { 0 }
         
-        // 1. Calculate ideal max width for each column (no wrapping)
+        // 1. Calculate min and max intrinsic widths for each column
         val maxIntrinsicWidths = IntArray(columnCount) { 0 }
+        val minIntrinsicWidths = IntArray(columnCount) { 0 }
         measurables.forEachIndexed { index, measurable ->
             val col = index % columnCount
             maxIntrinsicWidths[col] = max(maxIntrinsicWidths[col], measurable.maxIntrinsicWidth(Constraints.Infinity))
+            minIntrinsicWidths[col] = max(minIntrinsicWidths[col], measurable.minIntrinsicWidth(Constraints.Infinity))
         }
         
         val totalMaxWidth = maxIntrinsicWidths.sum()
+        val totalMinWidth = minIntrinsicWidths.sum()
         val availableWidth = if (constraints.hasBoundedWidth) constraints.maxWidth else totalMaxWidth
         
-        // 2. Assign column widths proportionally if they exceed screen space
+        // 2. Assign column widths smartly
         if (totalMaxWidth <= availableWidth) {
+            // Case A: Everything fits comfortably
             for (i in 0 until columnCount) columnWidths[i] = maxIntrinsicWidths[i]
-        } else {
-            // Allocate space proportionally to how much text they contain
+        } else if (totalMinWidth >= availableWidth) {
+            // Case B: Extremely cramped, we can't even fit minimums. Scale by min widths.
             var remainingWidth = availableWidth
             for (i in 0 until columnCount - 1) {
-                val assigned = (maxIntrinsicWidths[i].toFloat() / totalMaxWidth * availableWidth).toInt()
+                val assigned = if (totalMinWidth == 0) 0 else (minIntrinsicWidths[i].toFloat() / totalMinWidth * availableWidth).toInt()
                 columnWidths[i] = assigned
                 remainingWidth -= assigned
             }
-            columnWidths[columnCount - 1] = max(0, remainingWidth) // Give whatever is left to the last column
+            columnWidths[columnCount - 1] = max(0, remainingWidth)
+        } else {
+            // Case C: Normal wrapping. Give minimums, distribute the rest based on how much extra they want.
+            val extraAvailable = availableWidth - totalMinWidth
+            val totalExtraWanted = totalMaxWidth - totalMinWidth
+            
+            var remainingExtra = extraAvailable
+            for (i in 0 until columnCount - 1) {
+                val extraWanted = maxIntrinsicWidths[i] - minIntrinsicWidths[i]
+                val assignedExtra = if (totalExtraWanted == 0) 0 else (extraWanted.toFloat() / totalExtraWanted * extraAvailable).toInt()
+                columnWidths[i] = minIntrinsicWidths[i] + assignedExtra
+                remainingExtra -= assignedExtra
+            }
+            columnWidths[columnCount - 1] = minIntrinsicWidths[columnCount - 1] + max(0, remainingExtra)
         }
         
         // 3. Find height needed for each row based on these wrapped column widths

@@ -17,9 +17,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "pilcrow"
 
-// Original Android app (kept for reference / dual-target builds)
-// include(":app")
-
 // Shared pure-Kotlin domain logic (no platform dependencies)
 include(":core")
 
